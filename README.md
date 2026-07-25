@@ -32,7 +32,7 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 
 Everything below was added/changed on top of JJ Launcher; anything not listed here (media scanner, EQ, Bluetooth pairing, Wi-Fi keyboard, web server upload, custom theme engine, etc.) still works exactly as in the original project — see [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) for that documentation.
 
-- **Installable as a flashable ROM** — `InniClassic-<version>-rom.zip` flashes directly via the [Innioasis Updater](https://www.innioasis.com/pages/download), no ADB required. Bundles the latest Y1 Firmware with InniClassic pre-installed as the system launcher. The APK is still available separately for updating an existing JJ Launcher install.
+- **Installable as a flashable ROM** — `rom.zip` flashes directly via the [Innioasis Updater](https://www.innioasis.com/pages/download), no ADB required. Bundles the latest Y1 Firmware with InniClassic pre-installed as the system launcher. The APK is still available separately for updating an existing JJ Launcher install.
 - **Built-in "iPod Classic" theme** — a bundled, ready-to-use theme aiming for a 1:1 iPod Classic look, plus an **iPod Classic (Dark)** variant with the same layout in an inverted dark palette:
   - White (or black, in Dark), plain-text iPod-style menu lists (no icons, tight left margin, consistent bold system font)
   - Two-pane Main Menu and Music menu: menu list on the left, a slowly panning album cover on the right that fills the entire remaining screen edge-to-edge and extends up behind the status bar
@@ -65,7 +65,7 @@ There are two ways to get InniClassic onto your Innioasis Y1. Method 1 is recomm
 
 The ROM package installs the latest **Y1 Firmware 3.1.2** with **InniClassic** already baked in as the system launcher — no ADB, no manual uninstall step, nothing else to do afterward.
 
-1. Download `InniClassic-<version>-rom.zip` from this repo's [Releases](../../releases) page.
+1. Download `rom.zip` from this repo's [Releases](../../releases) page — the Innioasis Updater expects this exact filename, so keep it as-is after downloading.
 2. Open the [Innioasis Updater](https://www.innioasis.com/pages/download), select that zip as a local firmware file, and follow the on-screen instructions.
 3. Once it finishes and the device reboots, InniClassic is the active launcher — nothing further to install.
 

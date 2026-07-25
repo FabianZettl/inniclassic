@@ -7,7 +7,7 @@ All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are 
 Two bug fixes reported by u/withclay on Reddit. Also: the project is now named **InniClassic**, and installable as a full ROM.
 
 ### Added
-- **Flashable ROM**: `InniClassic-1.1.1-rom.zip`, installable directly via the [Innioasis Updater](https://www.innioasis.com/pages/download) — no ADB required. Ships the latest Y1 Firmware 3.1.2 with InniClassic pre-installed as the system launcher.
+- **Flashable ROM**: `rom.zip`, installable directly via the [Innioasis Updater](https://www.innioasis.com/pages/download) — no ADB required (the Updater expects this exact filename). Ships the latest Y1 Firmware 3.1.2 with InniClassic pre-installed as the system launcher.
 
 ### Changed
 - Project renamed to **InniClassic** (still based on and credited to JJ Launcher — see README). No functional/version change, same 1.1.1 build.
