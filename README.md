@@ -32,20 +32,30 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 
 Everything below was added/changed on top of JJ Launcher; anything not listed here (media scanner, EQ, Bluetooth pairing, Wi-Fi keyboard, web server upload, custom theme engine, etc.) still works exactly as in the original project — see [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) for that documentation.
 
-- **Built-in "iPod Classic" theme** — a bundled, ready-to-use theme aiming for a 1:1 iPod Classic look:
-  - White, plain-text iPod-style menu lists (no icons, tight left margin, consistent bold system font)
-  - Two-pane Main Menu and Music menu: menu list on the left, a slowly panning album cover on the right that fills the screen and extends up behind the status bar
-  - Redesigned Now Playing screen: angled album cover with a reflection underneath, centered track info, thick square progress bar
-  - Redesigned album lists: large cover art, bold album name + song count subtitle, and an "All Songs" shortcut per artist
+- **Installable as a flashable ROM** — `InniClassic-<version>-rom.zip` flashes directly via the [Innioasis Updater](https://www.innioasis.com/pages/download), no ADB required. Bundles the latest Y1 Firmware with InniClassic pre-installed as the system launcher. The APK is still available separately for updating an existing JJ Launcher install.
+- **Built-in "iPod Classic" theme** — a bundled, ready-to-use theme aiming for a 1:1 iPod Classic look, plus an **iPod Classic (Dark)** variant with the same layout in an inverted dark palette:
+  - White (or black, in Dark), plain-text iPod-style menu lists (no icons, tight left margin, consistent bold system font)
+  - Two-pane Main Menu and Music menu: menu list on the left, a slowly panning album cover on the right that fills the entire remaining screen edge-to-edge and extends up behind the status bar
+  - The status bar shows the current screen's name (Music/Now Playing/Settings/etc.) instead of a clock, like the real iPod's title bar
+  - Redesigned Now Playing screen: angled album cover with a reflection underneath (toggleable via a new **Album Cover Tilt** setting), centered track info, thick square progress bar
+  - Redesigned Artists/Albums lists: icon-free artist rows, large-cover two-line album rows (bold name + song count), "All Songs" shortcut per artist
   - A real search screen (title/artist/album) reachable from the Music menu
+  - iPod Classic is the true default theme on first launch (instead of upstream's stock dark theme)
+- **Now Playing depth** — center-click cycles Progress → Seek → Shuffle & Repeat → Rating sub-menus exactly like a real iPod Classic (wheel scrubs the track, cycles shuffle/repeat, or sets a 1–5 star rating depending on the state; reverts to volume control otherwise), plus:
+  - An **On-The-Go playlist** — the classic always-available instant playlist, one tap away from the new Now Playing hold-menu
+  - A **Now Playing hold-menu** (long-press Center): Add to On-The-Go, Browse Album, Browse Artist, Cancel — matching the real iPod's menu, plus a Toggle Visualizer entry for this project's bonus spectrum/lyrics view
+- **Music library depth**:
+  - **Composers** grouping in the Music menu
+  - **Artists** and **Album Artists** are now two separate entries — Artists groups by the literal track artist tag (so features/collaborations show up individually), Album Artists is the original grouped-by-album-artist view — matching real iPod Classic
+  - **Fast-scroll letter jump** — spin the wheel quickly through any alphabetized list to jump straight to the next letter, with an on-screen letter overlay, like a real click wheel
+  - Main Menu cleanup: Cover Flow, Audiobooks, Folders, Years, Recently Added, and My Favorites live in the Music menu, not cluttering the Main Menu, matching real iPod Classic's menu structure
+- **Music Quiz** — a from-scratch recreation of the classic iPod Music Quiz game using your own library, styled in the original's 2000s "Fruitiger Aero" glossy look. Structured into 5 rounds of 8 questions each, with a round-complete checkpoint screen and a distinct victory screen for clearing all 5 rounds (bonus rounds and additional question types are planned but not built yet)
 - **Last.fm scrobbling** — two independent mechanisms, like Rockbox:
   - A permanent local `.scrobbler.log` in the classic Audioscrobbler 1.1 format
   - Live scrobbling against the real Last.fm API (`auth.getMobileSession` / `track.updateNowPlaying` / `track.scrobble`), with a browser-based login flow (via the device's Wi-Fi web server) since typing a username/password with a click-wheel is painful
-- **Music Quiz (first version)** — a from-scratch recreation of the classic iPod Music Quiz game using your own library: 10-second clips, 5-answer rounds, lives, and a score, styled in the original's 2000s "Fruitiger Aero" glossy look
 - **OGG Vorbis support** — playback and library scanning for `.ogg` files, including automatic detection of files that are actually Opus-encoded but saved with an `.ogg` extension (common with some ripping tools)
-- **Now Playing depth** — center-click cycles Progress → Seek → Shuffle & Repeat → Rating sub-menus exactly like a real iPod Classic, plus star ratings, an On-The-Go playlist, and a matching Now Playing hold-menu (Add to On-The-Go / Browse Album / Browse Artist)
-- **Fast-scroll letter jump** — spin the wheel quickly through Artists/Albums/Songs/Genres/Composers/Search to jump straight to the next letter, with an on-screen letter overlay, like a real click wheel
-- Assorted library/UI fixes made along the way: duplicate song de-duplication, folder-cover-art fallback for albums without embedded art, album-artist grouping, forced 1:1 album art cropping, and OOM hardening for the device's limited RAM during large library scans
+- **Bluetooth reliability fix** — some speakers failed to connect because `BLUETOOTH_PRIVILEGED`/`WRITE_SECURE_SETTINGS` are signature-level permissions that simply declaring them in the manifest doesn't grant; now self-granted via a root shell command at startup, alongside the existing AVRCP version fix
+- Assorted library/UI fixes made along the way: duplicate song de-duplication, folder-cover-art fallback for albums without embedded art, album-artist grouping, forced 1:1 album art cropping, OOM hardening for large library scans, track titles no longer show their file extension when a file has no title tag, consistent menu font size across every screen, and the wheel no longer stays active (e.g. changing volume) while the screen is locked
 
 ## Installation
 
