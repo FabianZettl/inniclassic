@@ -1,10 +1,16 @@
 # Changelog
 
-All notable changes to JJ Launcher Classic Version are documented here. This fork is based on JJ Launcher `0.11`; this changelog covers only what changed in this fork on top of that base.
+All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
 ## [1.1.1] - 2026-07-23
 
-Two bug fixes reported by u/withclay on Reddit.
+Two bug fixes reported by u/withclay on Reddit. Also: the project is now named **InniClassic**, and installable as a full ROM.
+
+### Added
+- **Flashable ROM**: `InniClassic-1.1.1-rom.zip`, installable directly via the [Innioasis Updater](https://www.innioasis.com/pages/download) — no ADB required. Ships the latest Y1 Firmware 3.1.2 with InniClassic pre-installed as the system launcher.
+
+### Changed
+- Project renamed to **InniClassic** (still based on and credited to JJ Launcher — see README). No functional/version change, same 1.1.1 build.
 
 ### Fixed
 - Wireless PC Upload (web server) status text was hardcoded white, making it invisible against the iPod Classic theme's white background once the server was started. Also fixed the same hardcoded-near-white issue on the Bluetooth/Wi-Fi/Brightness/Storage/Settings screen titles, which had the identical problem.

@@ -295,6 +295,15 @@ public class ThemeManager {
     }
 
     public static void setThemeIndex(int index) { if (index >= 0 && index < availableThemes.size()) currentThemeIndex = index; else currentThemeIndex = 0; }
+
+    // 🚀 [기본 테마 지정] 이름으로 테마를 찾습니다 - zip 로딩 순서가 바뀌어도 항상 정확한 테마를 찾기 위함
+    // (예: 첫 실행 시 "app_theme_index" 저장값이 없을 때 "iPod Classic"을 기본값으로 사용)
+    public static int findThemeIndexByName(String name) {
+        for (int i = 0; i < availableThemes.size(); i++) {
+            if (availableThemes.get(i).name.equals(name)) return i;
+        }
+        return -1;
+    }
     public static int getCurrentThemeIndex() { return currentThemeIndex; }
     public static ThemeData getCurrentTheme() { return availableThemes.get(currentThemeIndex); }
     public static android.graphics.Typeface getCustomFont() {

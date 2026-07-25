@@ -128,7 +128,12 @@ public class MainActivity extends Activity {
     private List<SongItem> quizPool = new ArrayList<>();
     private SongItem quizCorrectAnswer;
     private int quizScore = 0;
-    private int quizRound = 0;
+    // 🚀 [Music Quiz 2 라운드 구조] 5개 라운드 x 8문제. 한 라운드를 다 풀면(=8문제 답변) 다음 라운드로 진행합니다.
+    // (목숨 3개는 게임 전체 공용 - 다 떨어지면 라운드 도중이라도 바로 게임 오버, 기존과 동일)
+    private static final int QUIZ_QUESTIONS_PER_ROUND = 8;
+    private static final int QUIZ_TOTAL_ROUNDS = 5;
+    private int quizRoundNumber = 1; // 1~5
+    private int quizQuestionInRound = 0; // 현재 라운드 안에서 몇 번째 문제인지 (0~8)
     private int quizLives = 3;
     private boolean quizAnswered = false;
     private boolean quizWasPlayingBeforeStart = false;
@@ -237,6 +242,8 @@ public class MainActivity extends Activity {
     public android.media.audiofx.Virtualizer virtualizer;
     public android.media.audiofx.LoudnessEnhancer loudnessEnhancer;
     public boolean isSoundCheckEnabled = false; // 🚀 [iPod 스타일] Sound Check - 곡마다 다른 음량을 비슷하게 맞춰줍니다
+    public boolean isAlbumTiltEnabled = true; // 🚀 [Now Playing 커버 기울기] 끄면 정면으로 평평하게 표시
+    private View frameAlbumArt, frameAlbumReflection;
     public int currentBassBoostStep = 0; // 0: OFF, 1: Weak, 2: Normal, 3: Strong
     public int currentVirtualizerStep = 0; // 0: OFF, 1: Weak, 2: Normal, 3: Strong
 
@@ -328,6 +335,8 @@ public class MainActivity extends Activity {
     public String virtualQueryValue = "";
     // 🚀 [신규 추가] Artists 탭에서 아티스트를 고르면, 그 아티스트의 앨범만 걸러서 보여주기 위한 필터
     public String categoryArtistFilter = "";
+    // 🚀 [Album Artists vs Artists] categoryArtistFilter가 albumArtist 기준인지 트랙 artist 기준인지 구분
+    public boolean categoryArtistFilterIsTrackArtist = false;
     public List<File> virtualSongList = new ArrayList<>();
     // 💡 백그라운드 미디어 제어권(스크린 오프) 변수
     // 🚀 [팟캐스트 전용] 다운로드 고유 ID와 진행률(%)을 실시간으로 추적하는 지능형 메모장
@@ -346,6 +355,7 @@ public class MainActivity extends Activity {
     private static final int BROWSER_YEARS = 10;
     private static final int BROWSER_GENRES = 11;
     private static final int BROWSER_COMPOSERS = 21;
+    private static final int BROWSER_TRACK_ARTISTS = 22; // 🚀 [신규] "Artists" - 트랙 아티스트 기준 (Album Artists와 별개)
     private static final int BROWSER_RECENTLY_ADDED = 12; // 🚀 [신규 장착] 최근 추가된 곡 상태
     // 🚀 [팟캐스트 엔진] 전용 상태 변수 추가!
     private static final int BROWSER_PODCAST_CHANNELS = 13;
@@ -1479,8 +1489,16 @@ public class MainActivity extends Activity {
             String cmd1 = "setprop persist.bluetooth.avrcpversion 1.6";
             String cmd2 = "settings put global bluetooth_avrcp_version 1.6";
 
-            // 두 명령어를 &&(AND)로 묶어 연달아 실행하고 시스템을 동기화(sync)합니다.
-            String combinedCmd = cmd1 + " && " + cmd2 + " && sync";
+            // 🚀 [블루투스 A2DP connect() 권한 자동 부여] BLUETOOTH_PRIVILEGED / WRITE_SECURE_SETTINGS는
+            // Manifest에 선언만 해선 서명(signature) 등급이라 자동으로 부여되지 않습니다 - "pm grant"를 su로
+            // 대신 실행해서 매번 앱을 켤 때마다 직접 부여해줍니다 (일부 스피커에서 페어링은 되는데 A2DP
+            // connect()가 조용히 실패하던 원인이었습니다).
+            String pkg = getPackageName();
+            String cmd3 = "pm grant " + pkg + " android.permission.BLUETOOTH_PRIVILEGED";
+            String cmd4 = "pm grant " + pkg + " android.permission.WRITE_SECURE_SETTINGS";
+
+            // 명령어들을 &&(AND)로 묶어 연달아 실행하고 시스템을 동기화(sync)합니다.
+            String combinedCmd = cmd1 + " && " + cmd2 + " && " + cmd3 + " && " + cmd4 + " && sync";
 
             Process proc = Runtime.getRuntime().exec(new String[] { "su", "-c", combinedCmd });
             proc.waitFor(); // 명령어 적용이 끝날 때까지 잠시 대기
@@ -1492,9 +1510,15 @@ public class MainActivity extends Activity {
             e.printStackTrace();
         }
         try {
-            // 저장된 인덱스 번호를 불러옵니다. (파일이 지워졌을 수도 있으니 안전하게 처리됨)
-            int savedThemeIndex = prefs.getInt("app_theme_index", 0);
-            ThemeManager.setThemeIndex(savedThemeIndex);
+            // 🚀 [기본 테마 = iPod Classic] 저장된 값이 아예 없으면(최초 실행) "iPod Classic"을 기본값으로 사용합니다.
+            // zip 로딩 순서에 따라 인덱스가 달라질 수 있으므로 이름으로 찾습니다 - 못 찾으면 안전하게 0번(순정 Dark)으로.
+            if (!prefs.contains("app_theme_index")) {
+                int ipodClassicIndex = ThemeManager.findThemeIndexByName("iPod Classic");
+                ThemeManager.setThemeIndex(ipodClassicIndex >= 0 ? ipodClassicIndex : 0);
+            } else {
+                int savedThemeIndex = prefs.getInt("app_theme_index", 0);
+                ThemeManager.setThemeIndex(savedThemeIndex);
+            }
         } catch (Exception e) {
         }
 
@@ -1573,6 +1597,7 @@ public class MainActivity extends Activity {
             isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", false);
             volumeLimitMax = prefs.getInt("volume_limit_max", -1);
             isSoundCheckEnabled = prefs.getBoolean("sound_check_enabled", false);
+            isAlbumTiltEnabled = prefs.getBoolean("album_tilt_enabled", true);
         } catch (Exception e) {
         }
         // 💡 [EQ 프리셋 목록 자동 로드] 기기가 지원하는 이퀄라이저 리스트를 가져옵니다.
@@ -1935,17 +1960,18 @@ public class MainActivity extends Activity {
         ivAlbumArt = findViewById(R.id.iv_album_art);
         ivAlbumReflection = findViewById(R.id.iv_album_reflection);
         // 🚀 iPod Classic 스타일: 앨범 커버를 살짝 입체적으로 기울이되, 과도하게 일그러지지 않도록 카메라 거리를 멀리 설정!
-        View frameAlbumArt = findViewById(R.id.frame_album_art);
+        frameAlbumArt = findViewById(R.id.frame_album_art);
         if (frameAlbumArt != null) {
             frameAlbumArt.setCameraDistance(getResources().getDisplayMetrics().density * 3500f);
         }
-        View frameAlbumReflection = findViewById(R.id.frame_album_reflection);
+        frameAlbumReflection = findViewById(R.id.frame_album_reflection);
         if (frameAlbumReflection != null) {
             frameAlbumReflection.setCameraDistance(getResources().getDisplayMetrics().density * 3500f);
             // 🚀 [버그 방지] 반사 이미지가 자기 컨테이너 경계 밖(187dp짜리가 28dp 상자 안)으로 삐져나오지 않도록
             // 소프트웨어 렌더링으로 강제 - 회전(rotationY) + 큰 자식뷰 조합에서 하드웨어 가속 클리핑이 깨지는 구형 안드로이드 버그 회피!
             frameAlbumReflection.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         }
+        applyAlbumTiltSetting();
         ivPlayerBgBlur = findViewById(R.id.iv_player_bg_blur);
         ivPlayerBgBlur.setScaleX(1.05f);
         ivPlayerBgBlur.setScaleY(1.05f);
@@ -2420,7 +2446,12 @@ public class MainActivity extends Activity {
                     }
 
                     // ⬇️ 여기부터는 '새로 발견된 파일'에만 실행되는 무거운 태그 추출 구역입니다.
+                    // 🚀 [제목에 확장자 노출 버그 수정] 태그가 없어 파일명으로 대체될 때, .ogg/.wav 같은
+                    // 확장자가 그대로 제목에 남지 않도록 미리 잘라냅니다!
                     String title = f.getName();
+                    int fallbackTitleDot = title.lastIndexOf(".");
+                    if (fallbackTitleDot > 0)
+                        title = title.substring(0, fallbackTitleDot);
                     boolean isBook = (targetLibrary == audiobookLibrary);
                     String artist = isBook ? t("Unknown Author") : t("Unknown Artist");
                     String album = isBook ? t("Unknown Book") : t("Unknown Album");
@@ -3931,7 +3962,8 @@ public class MainActivity extends Activity {
     // =======================================================
     private void startMusicQuizSession() {
         quizScore = 0;
-        quizRound = 0;
+        quizRoundNumber = 1;
+        quizQuestionInRound = 0;
         quizLives = 3;
         quizGameOver = false;
         quizWasPlayingBeforeStart = com.themoon.y1.managers.AudioPlayerManager.getInstance().isPlaying();
@@ -3967,7 +3999,7 @@ public class MainActivity extends Activity {
         if (tvQuizScore != null)
             tvQuizScore.setText(String.format(Locale.US, "$%,d", quizScore * 100));
         if (tvQuizRound != null)
-            tvQuizRound.setText(String.valueOf(quizRound));
+            tvQuizRound.setText(String.valueOf(quizQuestionInRound));
         if (tvQuizLives != null) {
             StringBuilder hearts = new StringBuilder();
             for (int i = 0; i < 3; i++)
@@ -4082,8 +4114,19 @@ public class MainActivity extends Activity {
     }
 
     private void loadNextQuizQuestion() {
+        // 🚀 [라운드 완주 체크] 이번 라운드의 8문제를 다 풀었다면, 다음 문제를 내지 않고
+        // 마지막 라운드였으면 승리 화면을, 아니면 라운드 전환 화면을 띄웁니다!
+        if (quizQuestionInRound >= QUIZ_QUESTIONS_PER_ROUND) {
+            if (quizRoundNumber >= QUIZ_TOTAL_ROUNDS) {
+                showQuizVictory();
+            } else {
+                showRoundCompleteTransition();
+            }
+            return;
+        }
+
         quizAnswered = false;
-        quizRound++;
+        quizQuestionInRound++;
         updateQuizScoreLivesUI();
         if (tvQuizPrompt != null)
             tvQuizPrompt.setText(t("What song is playing?"));
@@ -4258,6 +4301,87 @@ public class MainActivity extends Activity {
                 }
             }
         }, 1200);
+    }
+
+    // 🚀 [Music Quiz 2] 8문제짜리 라운드를 목숨을 잃지 않고 다 풀었을 때 뜨는 전환 화면.
+    // (보너스 라운드는 다음 단계에서 추가 예정 - 지금은 라운드 사이의 체크포인트 역할만 합니다)
+    private void showRoundCompleteTransition() {
+        if (pbQuizTimer != null)
+            pbQuizTimer.setProgress(0);
+
+        if (tvQuizPrompt != null) {
+            tvQuizPrompt.setText(t("Round ") + quizRoundNumber + " " + t("Complete!"));
+        }
+        updateQuizScoreLivesUI();
+
+        containerQuizItems.removeAllViews();
+        LinearLayout btnContinue = createQuizAnswerPill(t("Continue"));
+        btnContinue.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                quizRoundNumber++;
+                quizQuestionInRound = 0;
+                loadNextQuizQuestion();
+            }
+        });
+        containerQuizItems.addView(btnContinue);
+
+        containerQuizItems.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (containerQuizItems.getChildCount() > 0)
+                    containerQuizItems.getChildAt(0).requestFocus();
+            }
+        }, 50);
+    }
+
+    // 🚀 [Music Quiz 2] 5라운드(40문제)를 전부 목숨 3개로 버텨냈을 때 뜨는 승리 화면 - Game Over와는 별개!
+    private void showQuizVictory() {
+        quizGameOver = true;
+        int highScore = prefs.getInt("quiz_high_score", 0);
+        boolean isNewHighScore = quizScore > highScore;
+        if (isNewHighScore) {
+            prefs.edit().putInt("quiz_high_score", quizScore).apply();
+            highScore = quizScore;
+        }
+
+        if (tvQuizPrompt != null) {
+            tvQuizPrompt.setText("🏆 " + t("You beat all 5 rounds!") + "\n"
+                    + (isNewHighScore ? t("New High Score!") : t("Best") + ": $" + (highScore * 100)));
+        }
+        if (pbQuizTimer != null)
+            pbQuizTimer.setProgress(0);
+        updateQuizScoreLivesUI();
+
+        containerQuizItems.removeAllViews();
+        LinearLayout btnAgain = createQuizAnswerPill(t("Play Again"));
+        btnAgain.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                startMusicQuizSession();
+            }
+        });
+        containerQuizItems.addView(btnAgain);
+
+        LinearLayout btnExit = createQuizAnswerPill(t("Exit"));
+        btnExit.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                exitMusicQuiz();
+            }
+        });
+        containerQuizItems.addView(btnExit);
+
+        containerQuizItems.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (containerQuizItems.getChildCount() > 0)
+                    containerQuizItems.getChildAt(0).requestFocus();
+            }
+        }, 50);
     }
 
     private void showQuizGameOver() {
@@ -5441,6 +5565,21 @@ public class MainActivity extends Activity {
         });
         containerSettingsItems.addView(btnSoundCheck);
 
+        // 🚀 [iPod 스타일] Now Playing 화면의 앨범 커버 입체 기울기 켜기/끄기
+        final LinearLayout btnAlbumTilt = createSettingRow("Album Cover Tilt", isAlbumTiltEnabled ? t("ON") : t("OFF"));
+        btnAlbumTilt.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                isAlbumTiltEnabled = !isAlbumTiltEnabled;
+                prefs.edit().putBoolean("album_tilt_enabled", isAlbumTiltEnabled).commit();
+                TextView tvStatus = (TextView) btnAlbumTilt.getChildAt(1);
+                tvStatus.setText(isAlbumTiltEnabled ? t("ON") : t("OFF"));
+                applyAlbumTiltSetting();
+            }
+        });
+        containerSettingsItems.addView(btnAlbumTilt);
+
         // 🚀 [신규 추가] 구글 ExoPlayer 타임 스트레칭 (배속 재생) 컨트롤 스위치!
         final String[] speedLabels = { "1.0x (Normal)", "1.2x (Fast)", "1.5x (Faster)", "2.0x (Very Fast)" };
         final float[] speedValues = { 1.0f, 1.2f, 1.5f, 2.0f };
@@ -5760,7 +5899,11 @@ public class MainActivity extends Activity {
                                     // 🚀 4. [추가] 현재 틀어져 있는 곡의 제목과 가수도 파일 원본 이름으로 즉시 되돌리기
                                     if (!currentPlaylist.isEmpty()) {
                                         File currentFile = currentPlaylist.get(currentIndex);
-                                        tvPlayerTitle.setText(currentFile.getName());
+                                        String resetTitle = currentFile.getName();
+                                        int resetDot = resetTitle.lastIndexOf(".");
+                                        if (resetDot > 0)
+                                            resetTitle = resetTitle.substring(0, resetDot);
+                                        tvPlayerTitle.setText(resetTitle);
                                         tvPlayerArtist.setText("Unknown Artist");
                                         tvPlayerAlbum.setText("");
                                     }
@@ -7085,13 +7228,27 @@ public class MainActivity extends Activity {
                     containerBrowserItems.addView(btnM3uPlaylist);
                 }
 
+                if (!isMusicMenuItemHidden("track_artists")) {
+                    View btnTrackArtist = createListButtonWithIcon("\uE7FD", t("Artists"));
+                    btnTrackArtist.setOnClickListener(v -> {
+                        clickFeedback();
+                        currentBrowserMode = BROWSER_TRACK_ARTISTS;
+                        virtualQueryValue = "";
+                        categoryArtistFilter = "";
+                        categoryArtistFilterIsTrackArtist = false;
+                        buildVirtualCategories("TRACK_ARTIST");
+                    });
+                    containerBrowserItems.addView(btnTrackArtist);
+                }
+
                 if (!isMusicMenuItemHidden("artists")) {
-                    View btnArtist = createListButtonWithIcon("\uE7FD", t("Artists"));
+                    View btnArtist = createListButtonWithIcon("\uE7FD", t("Album Artists"));
                     btnArtist.setOnClickListener(v -> {
                         clickFeedback();
                         currentBrowserMode = BROWSER_ARTISTS;
                         virtualQueryValue = "";
                         categoryArtistFilter = "";
+                        categoryArtistFilterIsTrackArtist = false;
                         buildVirtualCategories("ARTIST");
                     });
                     containerBrowserItems.addView(btnArtist);
@@ -7104,6 +7261,7 @@ public class MainActivity extends Activity {
                         currentBrowserMode = BROWSER_ALBUMS;
                         virtualQueryValue = "";
                         categoryArtistFilter = "";
+                        categoryArtistFilterIsTrackArtist = false;
                         buildVirtualCategories("ALBUM");
                     });
                     containerBrowserItems.addView(btnAlbum);
@@ -8040,8 +8198,10 @@ public class MainActivity extends Activity {
             tvBrowserPath.setText((type.equals("ARTIST") ? t("Authors") : t("Books")));
         } else if (type.equals("COMPOSER")) {
             tvBrowserPath.setText(t("Composers"));
+        } else if (type.equals("TRACK_ARTIST")) {
+            tvBrowserPath.setText(t("Artists"));
         } else {
-            tvBrowserPath.setText((type.equals("ARTIST") ? t("Artists") : t("Albums")));
+            tvBrowserPath.setText((type.equals("ARTIST") ? t("Album Artists") : t("Albums")));
         }
 
         // 🚀 스위치에 따라 뒤질 바구니를 바꿉니다!
@@ -8050,15 +8210,20 @@ public class MainActivity extends Activity {
         HashSet<String> uniqueCategories = new HashSet<>();
         for (SongItem song : activeLibrary) {
             // 🚀 [수정] 앨범 목록을 특정 아티스트로 걸러야 한다면, 그 아티스트의 곡이 아닌 건 건너뜁니다!
-            if (type.equals("ALBUM") && !categoryArtistFilter.isEmpty()
-                    && !categoryArtistFilter.equals(song.albumArtist)) {
-                continue;
+            // (Album Artists에서 들어왔으면 albumArtist 기준, Artists에서 들어왔으면 트랙 artist 기준)
+            if (type.equals("ALBUM") && !categoryArtistFilter.isEmpty()) {
+                String matchField = categoryArtistFilterIsTrackArtist ? song.artist : song.albumArtist;
+                if (!categoryArtistFilter.equals(matchField)) {
+                    continue;
+                }
             }
 
             // 🟢 [완벽 수정] YEAR와 GENRE 분기를 추가하여 중복 없는 알맹이 명단을 긁어모읍니다.
             String val = "Unknown";
             if (type.equals("ARTIST"))
-                val = song.albumArtist; // 🚀 [수정] 트랙 아티스트가 아니라 앨범 아티스트 기준으로 그룹핑!
+                val = song.albumArtist; // 🚀 Album Artists: 앨범 아티스트 기준으로 그룹핑
+            else if (type.equals("TRACK_ARTIST"))
+                val = song.artist; // 🚀 Artists: 트랙에 찍힌 실제 아티스트 기준으로 그룹핑 (feat. 등도 전부 개별 등장)
             else if (type.equals("ALBUM"))
                 val = song.album;
             else if (type.equals("YEAR"))
@@ -10629,6 +10794,15 @@ public class MainActivity extends Activity {
     }
 
     // 🚀 [iPod 스타일] Now Playing 하단 바 4단계 순환 (Progress→Seek→Shuffle&Repeat→Rating→Progress)
+    // 🚀 [Now Playing 커버 기울기 설정] 켜져있으면 18도 입체 기울기, 꺼져있으면 정면 평평하게!
+    private void applyAlbumTiltSetting() {
+        float tilt = isAlbumTiltEnabled ? 18f : 0f;
+        if (frameAlbumArt != null)
+            frameAlbumArt.setRotationY(tilt);
+        if (frameAlbumReflection != null)
+            frameAlbumReflection.setRotationY(tilt);
+    }
+
     private void updateNowPlayingBottomBarState() {
         if (rowPlayerProgress == null) return;
         rowPlayerProgress.setVisibility(nowPlayingBottomState == 0 ? View.VISIBLE : View.GONE);
@@ -11284,7 +11458,11 @@ public class MainActivity extends Activity {
                         } else if (currentBrowserMode == BROWSER_ARTISTS) {
                             currentBrowserMode = BROWSER_ROOT;
                             // 🚀 [오디오북 포커스 버그 수리]
-                            lastBrowserFocusText = isAudiobookLibraryMode ? t("Authors") : t("Artists");
+                            lastBrowserFocusText = isAudiobookLibraryMode ? t("Authors") : t("Album Artists");
+                            buildFileBrowserUI();
+                        } else if (currentBrowserMode == BROWSER_TRACK_ARTISTS) {
+                            currentBrowserMode = BROWSER_ROOT;
+                            lastBrowserFocusText = t("Artists");
                             buildFileBrowserUI();
                         } else if (currentBrowserMode == BROWSER_FAVORITES) {
                             currentBrowserMode = BROWSER_ROOT;
@@ -11315,12 +11493,14 @@ public class MainActivity extends Activity {
                             buildM3uPlaylistUI();
                         } else if (currentBrowserMode == BROWSER_ALBUMS) {
                             // 🚀 [추가] 아티스트를 통해 들어온 앨범 목록이면, 루트가 아니라 그 아티스트로 되돌아갑니다!
+                            // (Artists에서 들어왔으면 Artists로, Album Artists에서 들어왔으면 Album Artists로)
                             if (!categoryArtistFilter.isEmpty()) {
                                 String exitedArtist = categoryArtistFilter;
+                                boolean wasTrackArtist = categoryArtistFilterIsTrackArtist;
                                 categoryArtistFilter = "";
-                                currentBrowserMode = BROWSER_ARTISTS;
+                                currentBrowserMode = wasTrackArtist ? BROWSER_TRACK_ARTISTS : BROWSER_ARTISTS;
                                 virtualQueryValue = exitedArtist;
-                                buildVirtualCategories("ARTIST");
+                                buildVirtualCategories(wasTrackArtist ? "TRACK_ARTIST" : "ARTIST");
                             } else {
                                 currentBrowserMode = BROWSER_ROOT;
                                 // 🚀 [오디오북 포커스 버그 수리]
@@ -12461,6 +12641,7 @@ public class MainActivity extends Activity {
                     .remove("time_in_title_bar")
                     .remove("volume_limit_max")
                     .remove("sound_check_enabled")
+                    .remove("album_tilt_enabled")
                     .remove("backlight_timer_index")
                     .remove("screen_off_control")
                     .remove("repeat_mode")
@@ -12477,11 +12658,13 @@ public class MainActivity extends Activity {
         isTimeInTitleBar = false;
         volumeLimitMax = -1;
         isSoundCheckEnabled = false;
+        isAlbumTiltEnabled = true;
         backlightTimerIndex = 0;
         isScreenOffControlEnabled = false;
         repeatMode = 0;
         isLoopScrollOn = true;
         currentEqProfile = "preset_0";
+        applyAlbumTiltSetting();
 
         try {
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC,
@@ -14220,6 +14403,7 @@ public class MainActivity extends Activity {
                 clickFeedback();
                 dialog.dismiss();
                 categoryArtistFilter = songItem.albumArtist;
+                categoryArtistFilterIsTrackArtist = false;
                 virtualQueryValue = "";
                 currentBrowserMode = BROWSER_ALBUMS;
                 changeScreen(STATE_BROWSER);
@@ -14923,7 +15107,8 @@ public class MainActivity extends Activity {
     public static final String[][] MUSIC_MENU_ITEMS = {
             {"coverflow", "Cover Flow"},
             {"playlists", "Playlists"},
-            {"artists", "Artists"},
+            {"track_artists", "Artists"},
+            {"artists", "Album Artists"},
             {"albums", "Albums"},
             {"songs", "Songs"},
             {"genres", "Genres"},

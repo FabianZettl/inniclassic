@@ -147,8 +147,10 @@ public class CategoryListAdapter extends BaseAdapter {
             // 🚀 [신규 추가] 아티스트의 앨범 목록 맨 위 "전체 곡" 항목: 검정 배경 + 음표 아이콘, 전체 곡 수 표시
             tvTitle.setText(MainActivity.instance.t("All Songs"));
             int allCount = 0;
+            boolean isTrackArtistMode = MainActivity.instance.categoryArtistFilterIsTrackArtist;
             for (SongItem song : MainActivity.customLibrary) {
-                if (MainActivity.instance.categoryArtistFilter.equals(song.albumArtist))
+                String matchField = isTrackArtistMode ? song.artist : song.albumArtist;
+                if (MainActivity.instance.categoryArtistFilter.equals(matchField))
                     allCount++;
             }
             tvSubtitle.setText(allCount == 1 ? t1Song() : (allCount + " " + tSongs()));
@@ -179,7 +181,10 @@ public class CategoryListAdapter extends BaseAdapter {
                 @Override
                 public void onClick(View v) {
                     MainActivity.instance.clickFeedback();
-                    MainActivity.instance.virtualQueryType = "ARTIST_ALL_ALBUMS";
+                    // 🚀 Artists(트랙 아티스트)에서 들어왔으면 "ARTIST"(song.artist 기준), Album Artists에서
+                    // 들어왔으면 기존처럼 "ARTIST_ALL_ALBUMS"(song.albumArtist 기준)로 필터링합니다.
+                    MainActivity.instance.virtualQueryType = MainActivity.instance.categoryArtistFilterIsTrackArtist
+                            ? "ARTIST" : "ARTIST_ALL_ALBUMS";
                     MainActivity.instance.virtualQueryValue = MainActivity.instance.categoryArtistFilter;
                     MainActivity.instance.currentBrowserMode = MainActivity.BROWSER_VIRTUAL_SONGS;
                     MainActivity.instance.buildVirtualSongs();
@@ -376,8 +381,10 @@ public class CategoryListAdapter extends BaseAdapter {
             public void onClick(View v) {
                 MainActivity.instance.clickFeedback();
                 // 🚀 [수정] 아티스트를 클릭하면 바로 곡 목록이 아니라, 그 아티스트의 앨범 목록을 먼저 보여줍니다!
-                if (type.equals("ARTIST")) {
+                // (Album Artists든 Artists든 동일한 드릴다운 - 필터링 기준만 다릅니다)
+                if (type.equals("ARTIST") || type.equals("TRACK_ARTIST")) {
                     MainActivity.instance.categoryArtistFilter = name;
+                    MainActivity.instance.categoryArtistFilterIsTrackArtist = type.equals("TRACK_ARTIST");
                     MainActivity.instance.virtualQueryValue = "";
                     MainActivity.instance.currentBrowserMode = MainActivity.BROWSER_ALBUMS;
                     MainActivity.instance.buildVirtualCategories("ALBUM");

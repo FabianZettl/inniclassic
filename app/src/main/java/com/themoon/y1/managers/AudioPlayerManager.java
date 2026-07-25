@@ -607,7 +607,12 @@ public class AudioPlayerManager {
             // ==========================================
             // 🖼️ [2구역] 화면 UI 덮어쓰기 (무조건 실행됨!)
             // ==========================================
-            String safeFileName = track.getName().replace(".mp3", "").replace(".flac", "").replace(".wav", "").replace(".m4a", "").replace(".opus", "").replace(".m4b", "");
+            // 🚀 [제목에 확장자 노출 버그 수정] 하드코딩된 확장자 목록(.ogg 등 누락 가능) 대신
+            // 마지막 점(.) 기준으로 잘라서 어떤 확장자든 안전하게 제거합니다!
+            String safeFileName = track.getName();
+            int safeFileNameDot = safeFileName.lastIndexOf(".");
+            if (safeFileNameDot > 0)
+                safeFileName = safeFileName.substring(0, safeFileNameDot);
             File coverFile = new File("/storage/sdcard0/Y1_Covers", safeFileName + ".jpg");
 
             // 🚀 [팟캐스트 초고속 렌더링 지름길 장착!]
