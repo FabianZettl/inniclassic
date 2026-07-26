@@ -400,10 +400,13 @@
 
         <TextView
             android:id="@+id/tv_status_clock"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_alignParentLeft="true"
+            android:layout_toLeftOf="@+id/layout_status_right_group"
             android:layout_centerVertical="true"
+            android:singleLine="true"
+            android:ellipsize="end"
             android:text="12:00 AM"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
@@ -414,6 +417,7 @@
             android:shadowRadius="3" />
 
         <LinearLayout
+            android:id="@+id/layout_status_right_group"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_alignParentRight="true"

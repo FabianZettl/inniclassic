@@ -2,6 +2,21 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.1.2] - 2026-07-27
+
+Another batch of Reddit-reported bugs, this time from multiple users.
+
+### Added
+- **Shuffle**: a "Shuffle" row now appears at the top of All Songs, matching the stock Y1 firmware — picks a random play order and starts playback immediately.
+- **FM Radio** is back in the Main Menu (both the light and dark iPod Classic theme) — it had quietly gone missing from the theme config.
+
+### Fixed
+- **Crash when browsing Artists, Album Artists, Albums, Songs, or Genres** — for some libraries, a song with a missing artist or album tag could be stored with a `null` value; anything that later compared against it (e.g. building the Albums list, matching songs to an artist) threw a crash instead of just treating it as "Unknown". Every song now always gets a safe "Unknown Artist"/"Unknown Album" fallback, closing this off for good.
+- **FLAC files stuck at 0:00** — FLAC playback was supposed to fall back to a dedicated engine on devices where ExoPlayer's FLAC support hangs, but the switch that was supposed to enable it was never actually turned on. It's wired up correctly now.
+- **Screen turning off during active use** — spinning the wheel didn't reset the auto-lock timer (the code that did lived in a method that never actually runs for wheel input), so the screen could sleep mid-session unless you pressed the center button. Any input now resets the timer correctly.
+- **Charging indicator** — the battery icon was supposed to show a small lightning bolt while charging, but the drawing code for it had been left disabled, so charging only caused a faint color shift. It now draws a proper bolt icon.
+- Long album/track names could visually run into the battery/Bluetooth icons in the status bar. Long titles are now truncated with an ellipsis instead of overlapping.
+
 ## [1.1.1] - 2026-07-23
 
 Two bug fixes reported by u/withclay on Reddit. Also: the project is now named **InniClassic**, and installable as a full ROM.

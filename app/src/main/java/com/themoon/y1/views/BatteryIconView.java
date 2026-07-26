@@ -5,6 +5,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -15,8 +16,9 @@ public class BatteryIconView extends View {
     private boolean isCharging = false;
     private int color = Color.WHITE;
 
-    private Paint paintFill, paintStroke, paintTerminal, paintText;
+    private Paint paintFill, paintStroke, paintTerminal, paintText, paintBolt;
     private RectF rectShell, rectFill, rectTerminal;
+    private Path boltPath = new Path();
 
     public BatteryIconView(Context context) {
         super(context);
@@ -40,6 +42,11 @@ public class BatteryIconView extends View {
         paintText = new Paint(Paint.ANTI_ALIAS_FLAG);
         paintText.setTextAlign(Paint.Align.CENTER);
         paintText.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+
+        // 🚀 [충전 표시] 충전 중일 때 배터리 안에 그려 넣는 작은 번개 아이콘용 페인트
+        paintBolt = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paintBolt.setStyle(Paint.Style.FILL);
+        paintBolt.setColor(0xFF2E7D32); // 초록 알맹이 위에서도 또렷하게 보이는 짙은 색
 
         rectShell = new RectF();
         rectFill = new RectF();
@@ -109,21 +116,24 @@ public class BatteryIconView extends View {
             canvas.drawRoundRect(rectFill, pillRadius - padding, pillRadius - padding, paintFill);
         }
 
-        // 🚀 5. 배터리 정중앙에 잔량(숫자) 뚫어주기!
-        String text = isCharging ? "⚡" : String.valueOf(level);
+        // 🚀 5. 충전 중이면 배터리 정중앙에 작은 번개 아이콘을 그려 넣습니다!
+        if (isCharging) {
+            float boltW = shellWidth * 0.34f;
+            float boltH = h * 0.72f;
+            float boltLeft = (shellWidth - boltW) / 2f;
+            float boltTop = (h - boltH) / 2f;
 
-        // [디테일] 알맹이가 절반 이상 차올라서 글씨를 덮어버리면, 글씨를 까만색으로 '반전'시켜서 잘 보이게 만듭니다!
-//        if (level > 45 && !isCharging) {
-//            paintText.setColor(Color.BLACK);
-//        } else {
-//            paintText.setColor(currentColor);
-//        }
-//
-//        paintText.setTextSize(h * 0.55f); // 글자 크기를 배터리 높이에 비례하게 맞춤
-//        Paint.FontMetrics fm = paintText.getFontMetrics();
-//        float textY = (h - fm.ascent - fm.descent) / 2f;
-//
-//        // 글씨 위치를 배터리 몸통(shellWidth)의 정중앙에 꽂아 넣습니다.
-//        canvas.drawText(text, shellWidth / 2f, textY, paintText);
+            boltPath.reset();
+            // 표준 번개 모양 (지그재그) - 정규화된 0~1 좌표를 아이콘 크기에 맞춰 배치
+            boltPath.moveTo(boltLeft + boltW * 0.62f, boltTop);
+            boltPath.lineTo(boltLeft + boltW * 0.10f, boltTop + boltH * 0.58f);
+            boltPath.lineTo(boltLeft + boltW * 0.42f, boltTop + boltH * 0.58f);
+            boltPath.lineTo(boltLeft + boltW * 0.38f, boltTop + boltH);
+            boltPath.lineTo(boltLeft + boltW * 0.90f, boltTop + boltH * 0.42f);
+            boltPath.lineTo(boltLeft + boltW * 0.58f, boltTop + boltH * 0.42f);
+            boltPath.close();
+
+            canvas.drawPath(boltPath, paintBolt);
+        }
     }
 }

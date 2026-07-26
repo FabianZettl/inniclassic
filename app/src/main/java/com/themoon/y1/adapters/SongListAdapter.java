@@ -20,19 +20,35 @@ public class SongListAdapter extends BaseAdapter {
         this.items = items;
     }
 
-    @Override
-    public int getCount() { return items.size(); }
+    // 🚀 [iPod 스타일] "All Songs" 목록 맨 위에 순정 기기처럼 "Shuffle" 항목을 하나 더 보여줍니다.
+    private boolean hasShuffleRow() {
+        return "ALL".equals(MainActivity.instance.virtualQueryType) && !items.isEmpty();
+    }
 
     @Override
-    public Object getItem(int position) { return items.get(position); }
+    public int getCount() { return items.size() + (hasShuffleRow() ? 1 : 0); }
+
+    @Override
+    public Object getItem(int position) {
+        if (hasShuffleRow()) {
+            if (position == 0) return null;
+            return items.get(position - 1);
+        }
+        return items.get(position);
+    }
 
     @Override
     public long getItemId(int position) { return position; }
 
     @Override
     public View getView(final int position, View convertView, ViewGroup parent) {
+        if (hasShuffleRow() && position == 0) {
+            return getShuffleRowView(convertView);
+        }
+        final int songPosition = hasShuffleRow() ? position - 1 : position;
+
         final android.view.View btn;
-        final SongItem song = items.get(position);
+        final SongItem song = items.get(songPosition);
 
         String iconCode = MainActivity.instance.isAudiobookLibraryMode ? "\uE310" : "\uE405";
         String displayTitle = song.title;
@@ -233,7 +249,7 @@ public class SongListAdapter extends BaseAdapter {
                 }
 
                 // 🎵 일반 음악 재생 (팟캐스트가 아닐 때만 여기로 내려옵니다)
-                com.themoon.y1.managers.AudioPlayerManager.getInstance().playTrackList(MainActivity.instance.virtualSongList, position);
+                com.themoon.y1.managers.AudioPlayerManager.getInstance().playTrackList(MainActivity.instance.virtualSongList, songPosition);
                 MainActivity.instance.changeScreen(3);
             }
         });
@@ -259,6 +275,34 @@ public class SongListAdapter extends BaseAdapter {
 
         return btn;
     }
+
+    // 🚀 [iPod 스타일] "All Songs" 맨 위 고정 "Shuffle" 항목 - 라이브러리 전체를 섞어서 바로 재생 시작!
+    private View getShuffleRowView(View convertView) {
+        View row;
+        if (convertView != null && "shuffle_row".equals(convertView.getTag())) {
+            row = convertView;
+        } else {
+            row = MainActivity.instance.createListButtonWithIcon("", MainActivity.instance.t("Shuffle"));
+            row.setTag("shuffle_row");
+            row.setLayoutParams(new AbsListView.LayoutParams(
+                    AbsListView.LayoutParams.MATCH_PARENT, AbsListView.LayoutParams.WRAP_CONTENT));
+        }
+
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                MainActivity.instance.clickFeedback();
+                java.util.List<java.io.File> shuffled = new java.util.ArrayList<>(MainActivity.instance.virtualSongList);
+                java.util.Collections.shuffle(shuffled);
+                com.themoon.y1.managers.AudioPlayerManager.getInstance().playTrackList(shuffled, 0);
+                MainActivity.instance.changeScreen(3);
+            }
+        });
+        row.setOnLongClickListener(null);
+
+        return row;
+    }
+
     // 🚀 [신규] 유니코드 아이콘 뷰(LinearLayout)와 순정 버튼(Button)을 모두 지원하는 하이브리드 포커스 리스너!
     private void applyDefaultFocusListener(final android.view.View btn, final String title, final int customColor) {
         final int normalColor = (customColor != 0) ? customColor : com.themoon.y1.ThemeManager.getTextColorPrimary();

@@ -538,9 +538,12 @@ public class AudioPlayerManager {
         main.tvPlayerTimeTotal.setText("00:00");
 
         String ext = track.getName().toLowerCase();
-        isUsingLegacyPlayer = false;
         boolean isOpus = ext.endsWith(".opus");
         boolean isFlac = ext.endsWith(".flac"); // 🚀 FLAC 판별기 신규 추가!
+        // 🚀 [FLAC 재생 버그 수정] 아래 "FLAC: 데드락 구출용 특수 엔진" 분기가 실제로는 한 번도 켜지지
+        // 않고 있었습니다 - isUsingLegacyPlayer가 항상 false로 고정되어 있어서 FLAC도 그냥 ExoPlayer로
+        // 흘러갔고, ExoPlayer의 FLAC 익스텐션이 일부 기기에서 멈춰버려(0:00에서 진행 안 됨) 있었습니다.
+        isUsingLegacyPlayer = isFlac;
 
         try {
             String t = null;
