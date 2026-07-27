@@ -50,7 +50,7 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 ### Beyond music
 - **Podcasts** — subscribe, stream, download for offline listening
 - **FM Radio** — talks to the real hardware tuner directly, no need for the stock radio app
-- **Video playback** — a dedicated Videos folder on the SD card, full-screen playback with wheel-driven volume/seek (see [Known limitations](#known-limitations))
+- **Video playback** — a dedicated Videos folder on the SD card, full-screen playback with wheel-driven volume/seek, powered by libVLC for stable, correctly-synced playback (see [Known limitations](#known-limitations))
 - **Audiobooks** — bookmarked, resumable playback
 - **Wireless PC Upload** — a small web server for copying music onto the device over Wi-Fi, no cable needed
 
@@ -66,7 +66,7 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 ## Known limitations
 
 - **Gapless playback** only activates for playlists of 15 tracks or fewer, with shuffle off and no FLAC files in the queue. FLAC decoding runs on a separate legacy engine that can't share ExoPlayer's native queue, and very large/shuffled queues (e.g. "All Songs") intentionally keep using the older, proven per-track loading path.
-- **Video playback** is a first implementation — it plays back reliably, but hasn't been optimized yet (large/high-bitrate files, thumbnails in the list, and resume-position are all unaddressed for now).
+- **Video playback** now uses libVLC rather than ExoPlayer, after finding that ExoPlayer's precise frame-timing API doesn't exist before Android API 21, and its fallback for older devices is effectively broken on the Y1's API 17 (audio stayed in sync, but picture played back many times faster than real time). Playback is stable now; thumbnails in the video list and resume-position are still unaddressed. For smooth playback, keep source files modest — 640×480, 30fps, ~2 Mbps or less (see [`tools/handbrake_y1_preset.json`](tools/handbrake_y1_preset.json) for a ready-to-import HandBrake preset).
 
 ## Installation
 

@@ -4,24 +4,25 @@ import android.content.Context;
 import android.net.Uri;
 import android.view.SurfaceView;
 
-import com.google.android.exoplayer2.DefaultRenderersFactory;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.ProgressiveMediaSource;
-import com.google.android.exoplayer2.upstream.DataSource;
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
-import com.google.android.exoplayer2.util.Util;
+import org.videolan.libvlc.LibVLC;
+import org.videolan.libvlc.Media;
+import org.videolan.libvlc.MediaPlayer;
+import org.videolan.libvlc.interfaces.IVLCVout;
 
 import java.io.File;
+import java.util.ArrayList;
 
-// 🚀 [신규 추가] 비디오 전용 재생 엔진 - AudioPlayerManager와 완전히 분리된 별도 ExoPlayer 인스턴스를 씁니다.
-// 음악 재생 로직(FLAC 특수 엔진, 트랙 큐 등)과 얽히지 않도록 독립적으로 구성했습니다.
+// 🚀 [비디오 전용 엔진 - VLC로 교체] ExoPlayer는 이 기기(Android API 17)에서 프레임을 정확한 시간에
+// 내보내는 API(releaseOutputBuffer with timestamp)가 API 21부터만 있어서, 그 이전 기기용 폴백
+// 타이밍 경로가 사실상 거의 테스트되지 않은 채로 남아있었습니다 - 오디오/포지션 시계는 정상인데
+// 화면만 디코더가 뽑아내는 대로 배속으로 흘러가 버리는 버그가 바로 이것 때문이었습니다.
+// VLC는 자체 네이티브 AV 싱크 엔진을 쓰기 때문에 이 문제를 완전히 우회합니다.
+// 음악 재생(AudioPlayerManager)은 계속 ExoPlayer를 그대로 씁니다 - 여긴 손대지 않습니다.
 public class VideoPlayerManager {
     private static VideoPlayerManager instance;
-    private SimpleExoPlayer exoPlayer;
-    private Context appContext;
+    private LibVLC libVLC;
+    private MediaPlayer mediaPlayer;
+    private SurfaceView attachedSurfaceView;
 
     public static VideoPlayerManager getInstance() {
         if (instance == null) instance = new VideoPlayerManager();
@@ -31,62 +32,86 @@ public class VideoPlayerManager {
     private VideoPlayerManager() {}
 
     private void ensurePlayer(Context context) {
-        if (exoPlayer == null) {
-            appContext = context.getApplicationContext();
-            DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(appContext);
-            exoPlayer = new SimpleExoPlayer.Builder(appContext, renderersFactory).build();
+        if (libVLC == null) {
+            ArrayList<String> options = new ArrayList<>();
+            libVLC = new LibVLC(context.getApplicationContext(), options);
+            mediaPlayer = new MediaPlayer(libVLC);
         }
     }
 
-    public void playVideo(Context context, File videoFile, SurfaceView surfaceView) {
+    public void playVideo(Context context, File videoFile, final SurfaceView surfaceView) {
         ensurePlayer(context);
-        exoPlayer.setVideoSurfaceView(surfaceView);
 
-        DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(appContext,
-                Util.getUserAgent(appContext, "InniClassic"));
-        DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
+        // 🚀 뷰가 바뀌었으면(다른 영상 화면 재진입 등) 기존 연결을 정리하고 새로 붙입니다.
+        if (attachedSurfaceView != surfaceView) {
+            IVLCVout oldVout = mediaPlayer.getVLCVout();
+            if (oldVout.areViewsAttached()) oldVout.detachViews();
+            attachedSurfaceView = surfaceView;
+        }
 
-        MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(videoFile));
-        MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory, extractorsFactory)
-                .createMediaSource(mediaItem);
+        final IVLCVout vlcVout = mediaPlayer.getVLCVout();
+        if (!vlcVout.areViewsAttached()) {
+            vlcVout.setVideoView(surfaceView);
+            vlcVout.attachViews();
+        }
 
-        exoPlayer.stop();
-        exoPlayer.clearMediaItems();
-        exoPlayer.setMediaSource(mediaSource);
-        exoPlayer.prepare();
-        exoPlayer.setPlayWhenReady(true);
+        // 🚀 [화면 꽉 채우기 버그 수정] setWindowSize()를 안 불러주면 VLC가 실제 화면 크기를 몰라서
+        // 원본 해상도 그대로(예: 320x240) 작게 그려버립니다 - SurfaceView가 아직 레이아웃을 마치지
+        // 않았을 수 있으므로 post()로 실제 크기가 잡힌 뒤에 넘겨줍니다.
+        surfaceView.post(new Runnable() {
+            @Override
+            public void run() {
+                int w = surfaceView.getWidth();
+                int h = surfaceView.getHeight();
+                if (w > 0 && h > 0) {
+                    vlcVout.setWindowSize(w, h);
+                }
+            }
+        });
+
+        mediaPlayer.stop();
+        Media media = new Media(libVLC, Uri.fromFile(videoFile));
+        mediaPlayer.setMedia(media);
+        media.release();
+        // 🚀 화면을 꽉 채우도록 비율 유지 + 최적 크기(Best-fit) 스케일링 (기본값이지만 명시적으로 지정)
+        mediaPlayer.setAspectRatio(null);
+        mediaPlayer.setScale(0);
+        mediaPlayer.play();
     }
 
     public void togglePlayPause() {
-        if (exoPlayer == null) return;
-        exoPlayer.setPlayWhenReady(!exoPlayer.getPlayWhenReady());
+        if (mediaPlayer == null) return;
+        if (mediaPlayer.isPlaying()) mediaPlayer.pause();
+        else mediaPlayer.play();
     }
 
     public boolean isPlaying() {
-        return exoPlayer != null && exoPlayer.getPlayWhenReady();
+        return mediaPlayer != null && mediaPlayer.isPlaying();
     }
 
     public void seekRelative(long deltaMs) {
-        if (exoPlayer == null) return;
-        long target = exoPlayer.getCurrentPosition() + deltaMs;
-        long duration = exoPlayer.getDuration();
+        if (mediaPlayer == null) return;
+        long target = mediaPlayer.getTime() + deltaMs;
+        long duration = mediaPlayer.getLength();
         if (duration > 0) target = Math.max(0, Math.min(target, duration));
         else target = Math.max(0, target);
-        exoPlayer.seekTo(target);
+        mediaPlayer.setTime(target);
     }
 
     public long getCurrentPosition() {
-        return exoPlayer != null ? exoPlayer.getCurrentPosition() : 0;
+        return mediaPlayer != null ? mediaPlayer.getTime() : 0;
     }
 
     public long getDuration() {
-        return exoPlayer != null ? Math.max(0, exoPlayer.getDuration()) : 0;
+        return mediaPlayer != null ? Math.max(0, mediaPlayer.getLength()) : 0;
     }
 
     public void stopAndRelease() {
-        if (exoPlayer != null) {
-            exoPlayer.stop();
-            exoPlayer.clearMediaItems();
+        if (mediaPlayer != null) {
+            mediaPlayer.stop();
+            IVLCVout vlcVout = mediaPlayer.getVLCVout();
+            if (vlcVout.areViewsAttached()) vlcVout.detachViews();
+            attachedSurfaceView = null;
         }
     }
 }

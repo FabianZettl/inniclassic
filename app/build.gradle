@@ -64,6 +64,10 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp:3.12.13'
     implementation 'org.conscrypt:conscrypt-android:2.5.2'
     implementation 'androidx.multidex:multidex:2.0.1'
+    // 🚀 [비디오 전용 엔진] ExoPlayer의 Pre-API21 프레임 타이밍 폴백이 이 기기(API 17)에서 깨져있어서
+    // (오디오/포지션 시계는 정상인데 화면만 배속으로 흘러가는 버그) 비디오만 VLC의 독자적인 네이티브
+    // AV 싱크 엔진으로 교체합니다. 음악(AudioPlayerManager)은 계속 ExoPlayer를 씁니다 - 여긴 안 건드림!
+    implementation 'org.videolan.android:libvlc-all:3.3.14'
 }
 // 파일 맨 밑에 추가: 최신 라이브러리 버전 체크 안전장치를 강제로 끄는 코드
 tasks.withType(com.android.build.gradle.internal.tasks.CheckAarMetadataTask).configureEach {

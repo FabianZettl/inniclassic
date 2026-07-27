@@ -1,0 +1,71 @@
+{
+    "PresetList": [
+        {
+            "PresetName": "InniClassic Y1 (MT6572) - Low-Res Diagnostic",
+            "PresetDescription": "Diagnostic step for choppy/stuttering video playback on the Y1 - 320x240, 30fps CFR, ~900 kbps H.264 Main, AAC 96kbps. If this still stutters, the bottleneck isn't resolution/bitrate but the decode+render pipeline itself on this hardware.",
+            "PresetFolder": false,
+            "Type": 1,
+            "VersionMajor": 1,
+            "VersionMicro": 0,
+            "VersionMinor": 6,
+            "ChildrenArray": [],
+
+            "FileFormat": "av_mp4",
+            "Mp4HttpOptimize": true,
+            "Mp4iPodCompatible": false,
+            "Optimize": true,
+
+            "PictureWidth": 320,
+            "PictureHeight": 240,
+            "PictureForceHeight": 0,
+            "PictureForceWidth": 0,
+            "PicturePAR": "auto",
+            "PictureModulus": 2,
+            "PictureAutoCrop": true,
+            "PictureRotate": "angle=0:hflip=0",
+
+            "VideoEncoder": "x264",
+            "VideoPreset": "medium",
+            "VideoEncoderPreset": "medium",
+            "VideoProfile": "main",
+            "VideoEncoderProfile": "main",
+            "VideoLevel": "3.0",
+            "VideoEncoderLevel": "3.0",
+            "VideoFramerate": "30",
+            "VideoFramerateMode": "cfr",
+            "VideoQualityType": 1,
+            "VideoAvgBitrate": 900,
+            "VideoTwoPass": false,
+            "VideoTurboTwoPass": false,
+            "VideoColorMatrixCode": 0,
+
+            "PictureDeinterlaceFilter": "off",
+            "PictureCombDetectPreset": "off",
+            "PictureDenoiseFilter": "off",
+            "PictureSharpenFilter": "off",
+            "PictureDetelecine": "off",
+
+            "AudioList": [
+                {
+                    "AudioEncoder": "av_aac",
+                    "AudioBitrate": 96,
+                    "AudioMixdown": "stereo",
+                    "AudioSamplerate": "auto",
+                    "AudioTrackQualityEnable": false,
+                    "AudioTrackGainSlider": 0,
+                    "AudioTrackDRCSlider": 0
+                }
+            ],
+            "AudioSecondaryEncoderMode": true,
+
+            "SubtitleAddCC": false,
+            "SubtitleAddForeignAudioSearch": false,
+            "SubtitleAddForeignAudioSubtitle": false,
+
+            "ChapterMarkers": false
+        }
+    ],
+    "VersionMajor": 1,
+    "VersionMicro": 0,
+    "VersionMinor": 6
+}
