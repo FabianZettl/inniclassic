@@ -73,16 +73,18 @@ public class CategoryListAdapter extends BaseAdapter {
         }
     }
 
-    // 🚀 [iPod 스타일] 앨범 행: 큼직한 정사각형 커버 + 굵은 앨범명 + 얇은 곡 수 서브타이틀 2줄 구성
+    // 🚀 [iPod 스타일] 앨범 행: 작은 정사각형 커버 + 굵은 앨범명 + 얇은 곡 수 서브타이틀 2줄 구성
+    // 🚀 [간격 통일] 실제 아이팟처럼 촘촘하게 - 커버를 78dp→40dp로 줄여서 화면에 훨씬 더 많은 앨범이 보이도록!
     private View getAlbumRowView(final int position, View convertView, final String name) {
         final float d = MainActivity.instance.getResources().getDisplayMetrics().density;
-        final int coverSize = (int) (78 * d);
+        final int coverSize = (int) (52 * d);
 
         final LinearLayout row;
         final ImageView ivCover;
         final LinearLayout textStack;
         final TextView tvTitle;
         final TextView tvSubtitle;
+        final TextView tvArrow;
 
         if (convertView instanceof LinearLayout && convertView.getTag() != null && "album_row".equals(convertView.getTag())) {
             row = (LinearLayout) convertView;
@@ -90,6 +92,7 @@ public class CategoryListAdapter extends BaseAdapter {
             textStack = (LinearLayout) row.getChildAt(1);
             tvTitle = (TextView) textStack.getChildAt(0);
             tvSubtitle = (TextView) textStack.getChildAt(1);
+            tvArrow = (TextView) row.getChildAt(2);
         } else {
             row = new LinearLayout(MainActivity.instance);
             row.setTag("album_row");
@@ -98,7 +101,7 @@ public class CategoryListAdapter extends BaseAdapter {
             row.setFocusable(true);
             row.setClickable(true);
             row.setSoundEffectsEnabled(false);
-            row.setPadding(0, 0, (int) (10 * d), 0);
+            row.setPadding((int) (8 * d), (int) (6 * d), (int) (10 * d), (int) (6 * d));
             row.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
             row.setLayoutParams(new AbsListView.LayoutParams(
                     AbsListView.LayoutParams.MATCH_PARENT,
@@ -114,12 +117,12 @@ public class CategoryListAdapter extends BaseAdapter {
             textStack.setOrientation(LinearLayout.VERTICAL);
             LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            textLp.leftMargin = (int) (15 * d);
+            textLp.leftMargin = (int) (10 * d);
             textStack.setLayoutParams(textLp);
 
             tvTitle = new TextView(MainActivity.instance);
             // 🚀 [Main Menu와 폰트 크기 통일] SP 대신 PX 단위로 강제 고정 - 모든 메뉴 화면에서 100% 동일한 렌더링 크기 보장!
-            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * d);
+            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 21f * d);
             tvTitle.setTypeface(ThemeManager.getCustomFontBold());
             tvTitle.setSingleLine(true);
             tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
@@ -128,18 +131,33 @@ public class CategoryListAdapter extends BaseAdapter {
             textStack.addView(tvTitle);
 
             tvSubtitle = new TextView(MainActivity.instance);
-            tvSubtitle.setTextSize(12f);
+            tvSubtitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 14f * d);
             tvSubtitle.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
             tvSubtitle.setSingleLine(true);
             tvSubtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
             LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            subLp.topMargin = (int) (2 * d);
+            subLp.topMargin = (int) (1 * d);
             tvSubtitle.setLayoutParams(subLp);
             textStack.addView(tvSubtitle);
 
             row.addView(textStack);
+
+            // 🚀 포커스된 행에만 나타나는 실제 아이팟 스타일 우측 화살표
+            tvArrow = new TextView(MainActivity.instance);
+            tvArrow.setText("〉");
+            tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * d);
+            tvArrow.setVisibility(View.GONE);
+            LinearLayout.LayoutParams lpArrow = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lpArrow.leftMargin = (int) (6 * d);
+            tvArrow.setLayoutParams(lpArrow);
+            row.addView(tvArrow);
         }
+
+        // 🚀 [흰색 화살표 고정] Songs 목록(createListButtonWithIcon)과 동일하게 테마색이 아닌 순백색으로 고정합니다.
+        tvArrow.setTextColor(0xFFFFFFFF);
+        tvArrow.setVisibility(row.isFocused() ? View.VISIBLE : View.GONE);
 
         final boolean isAllSongsRow = MainActivity.ALL_SONGS_SENTINEL.equals(name);
 
@@ -167,11 +185,13 @@ public class CategoryListAdapter extends BaseAdapter {
                         row.setBackground(MainActivity.instance.createFocusedButtonBackground());
                         tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
                         tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                        tvArrow.setVisibility(View.VISIBLE);
                         tvTitle.setSelected(true);
                     } else {
                         row.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
                         tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
                         tvSubtitle.setTextColor(ThemeManager.getTextColorSecondary());
+                        tvArrow.setVisibility(View.GONE);
                         tvTitle.setSelected(false);
                     }
                 }
@@ -314,12 +334,14 @@ public class CategoryListAdapter extends BaseAdapter {
                     row.setBackground(MainActivity.instance.createFocusedButtonBackground());
                     tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
                     tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                    tvArrow.setVisibility(View.VISIBLE);
                     MainActivity.instance.showFastScrollLetter(name);
                     tvTitle.setSelected(true);
                 } else {
                     row.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
                     tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
                     tvSubtitle.setTextColor(ThemeManager.getTextColorSecondary());
+                    tvArrow.setVisibility(View.GONE);
                     tvTitle.setSelected(false);
                 }
             }
@@ -339,44 +361,88 @@ public class CategoryListAdapter extends BaseAdapter {
         return row;
     }
 
-    // 🚀 아티스트 등 그 외 카테고리는 기존처럼 단순 텍스트 한 줄 Button으로 표시
+    // 🚀 아티스트 등 그 외 카테고리는 실제 아이팟처럼 촘촘한 한 줄 + 포커스일 때만 뜨는 우측 화살표로 표시
     private View getSimpleRowView(final int position, View convertView, final String name) {
-        final Button btn;
+        final LinearLayout row;
+        final TextView tvMain;
+        final TextView tvArrow;
 
-        if (convertView instanceof Button) {
-            btn = (Button) convertView;
+        if (convertView instanceof LinearLayout && "simple_row".equals(convertView.getTag())) {
+            row = (LinearLayout) convertView;
+            tvMain = (TextView) row.getChildAt(0);
+            tvArrow = (TextView) row.getChildAt(1);
         } else {
-            btn = MainActivity.instance.createListButton("");
-            btn.setLayoutParams(new AbsListView.LayoutParams(
+            final float d = MainActivity.instance.getResources().getDisplayMetrics().density;
+
+            row = new LinearLayout(MainActivity.instance);
+            row.setTag("simple_row");
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setFocusable(true);
+            row.setClickable(true);
+            row.setSoundEffectsEnabled(false);
+            // 🚀 [간격 통일] 실제 아이팟처럼 촘촘하게 - 위아래 여백을 대폭 줄여서 화면에 훨씬 더 많은 항목이 보이도록!
+            // 🚀 [좌측 정렬] 상태바 타이틀과 동일한 8dp에서 시작하도록 왼쪽 여백을 맞춥니다.
+            row.setPadding((int) (8 * d), (int) (6 * d), (int) (10 * d), (int) (6 * d));
+            row.setLayoutParams(new AbsListView.LayoutParams(
                     AbsListView.LayoutParams.MATCH_PARENT,
                     AbsListView.LayoutParams.WRAP_CONTENT));
+
+            tvMain = new TextView(MainActivity.instance);
+            tvMain.setSingleLine(true);
+            tvMain.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            tvMain.setMarqueeRepeatLimit(-1);
+            tvMain.setHorizontalFadingEdgeEnabled(true);
+            tvMain.setTypeface(ThemeManager.getCustomFontBold());
+            tvMain.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 21f * d);
+            LinearLayout.LayoutParams lpMain = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            tvMain.setLayoutParams(lpMain);
+            row.addView(tvMain);
+
+            // 🚀 포커스된 행에만 나타나는 실제 아이팟 스타일 우측 화살표
+            tvArrow = new TextView(MainActivity.instance);
+            tvArrow.setText("〉");
+            tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * d);
+            tvArrow.setVisibility(View.GONE);
+            LinearLayout.LayoutParams lpArrow = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lpArrow.leftMargin = (int) (6 * d);
+            tvArrow.setLayoutParams(lpArrow);
+            row.addView(tvArrow);
         }
 
-        // 🚀 [iPod 스타일] 아이콘 없이 순수 텍스트만 표시!
-        btn.setText(name);
-        btn.setCompoundDrawables(null, null, null, null);
+        tvMain.setText(name);
 
-        float rowDensity = MainActivity.instance.getResources().getDisplayMetrics().density;
-        btn.setPadding((int) (14 * rowDensity), (int) (12 * rowDensity),
-                (int) (10 * rowDensity), (int) (12 * rowDensity));
+        // 🚀 [버그 수정] 재활용된 행이 실제로는 포커스 상태인데도 무조건 평상시 배경으로 덮어써버리던
+        // 문제를 수정 - 포커스 상태를 그대로 반영합니다.
+        boolean isFocusedNow = row.isFocused();
+        row.setBackground(isFocusedNow ? MainActivity.instance.createFocusedButtonBackground()
+                : MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        tvMain.setTextColor(isFocusedNow ? ThemeManager.getListButtonFocusedTextColor() : ThemeManager.getTextColorPrimary());
+        // 🚀 [흰색 화살표 고정] Songs 목록(createListButtonWithIcon)과 동일하게 테마색이 아닌 순백색으로 고정합니다.
+        tvArrow.setTextColor(0xFFFFFFFF);
+        tvArrow.setVisibility(isFocusedNow ? View.VISIBLE : View.GONE);
 
-        btn.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+        row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
-                    btn.setBackground(MainActivity.instance.createFocusedButtonBackground());
-                    btn.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                    row.setBackground(MainActivity.instance.createFocusedButtonBackground());
+                    tvMain.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                    tvArrow.setVisibility(View.VISIBLE);
                     MainActivity.instance.showFastScrollLetter(name);
-                    btn.setSelected(true);
+                    tvMain.setSelected(true);
                 } else {
-                    btn.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
-                    btn.setTextColor(ThemeManager.getTextColorPrimary());
-                    btn.setSelected(false);
+                    row.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    tvMain.setTextColor(ThemeManager.getTextColorPrimary());
+                    tvArrow.setVisibility(View.GONE);
+                    tvMain.setSelected(false);
                 }
             }
         });
 
-        btn.setOnClickListener(new View.OnClickListener() {
+        row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 MainActivity.instance.clickFeedback();
@@ -397,7 +463,7 @@ public class CategoryListAdapter extends BaseAdapter {
             }
         });
 
-        return btn;
+        return row;
     }
 
     private String t1Song() {

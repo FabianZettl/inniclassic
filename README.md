@@ -4,10 +4,10 @@
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/Device-Innioasis%20Y1%20only-blue?style=flat-square" alt="Device">
   <img src="https://img.shields.io/badge/Status-Beta-Orange?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/Version-1.1.1-informational?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.2.0-informational?style=flat-square" alt="Version">
 </p>
 
-**InniClassic** is a launcher for the **Innioasis Y1** built directly on top of and based on [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) — all credit for the original launcher, media engine, and theme system goes to that project. The goal of InniClassic is to turn JJ Launcher into as close to the original **iPod Classic experience** as possible — a bundled iPod-style theme, Last.fm scrobbling, a Music Quiz mini-game, and broader format support — while keeping everything JJ Launcher already does well.
+**InniClassic** is a launcher for the **Innioasis Y1** built directly on top of and based on [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) — all credit for the original launcher, media engine, and theme system goes to that project. The goal of InniClassic is to turn JJ Launcher into as close to the original **iPod Classic experience** as possible, while going beyond it where it makes sense (FM Radio, Podcasts, Video, a from-scratch Music Quiz).
 
 This is **not** a GitHub "Fork" in the technical sense (it's a separate repository), but it is built directly on top of JJ Launcher's source and stays close to upstream so future JJ Launcher releases can keep being merged in.
 
@@ -22,40 +22,51 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 |---|---|---|
 | ![Main Menu](docs/screenshots/main-menu.png) | ![Now Playing](docs/screenshots/now-playing.png) | ![Music Menu](docs/screenshots/music-menu.png) |
 
-| Cover Flow | Album View | Music Quiz |
+| Artists | Album View | Cover Flow |
 |---|---|---|
-| ![Cover Flow](docs/screenshots/cover-flow.png) | ![Album View](docs/screenshots/album-view.png) | ![Music Quiz](docs/screenshots/music-quiz.png) |
+| ![Artists](docs/screenshots/artists.png) | ![Album View](docs/screenshots/album-view.png) | ![Cover Flow](docs/screenshots/cover-flow.png) |
 
 ---
 
-## What's different from upstream JJ Launcher
+## Features
 
-Everything below was added/changed on top of JJ Launcher; anything not listed here (media scanner, EQ, Bluetooth pairing, Wi-Fi keyboard, web server upload, custom theme engine, etc.) still works exactly as in the original project — see [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) for that documentation.
+### The iPod Classic experience
+- Bundled **iPod Classic** theme (light + dark variant), aiming for a 1:1 look: plain-text menu lists, real system-matched bold typography, tight iPod-accurate spacing, and a status bar that shows the current screen's name instead of a clock
+- Two-pane Main Menu and Music menu, both sharing the exact same look and behavior: menu list on the left, a slowly panning ("Ken Burns") album cover on the right that bleeds all the way to the top of the screen, behind the status bar
+- Redesigned **Now Playing** screen — large angled album cover with a reflection underneath (toggleable via **Album Cover Tilt**), a glass-look progress/volume bar, and a scrolling marquee for titles too long to fit
+- Center-click on Now Playing cycles **Progress → Seek → Shuffle & Repeat → Rating**, exactly like a real iPod Classic (the wheel scrubs, cycles shuffle/repeat, or sets a star rating depending on the state; volume control otherwise)
+- **On-The-Go playlist** and a **Now Playing hold-menu** (long-press Center): Add to On-The-Go, Rate Song, Browse Album, Browse Artist, Toggle Visualizer
+- **Favorites** with a heart indicator on Now Playing (hollow when not favorited, filled red when it is)
+- Fast-scroll letter jump on every alphabetized list, like spinning a real click wheel
+- A from-scratch recreation of the classic **iPod Music Quiz** using your own library, 5 rounds of 8 questions with round-complete and victory screens
 
-- **Installable as a flashable ROM** — `rom.zip` flashes directly via the [Innioasis Updater](https://www.innioasis.com/pages/download), no ADB required. Bundles the latest Y1 Firmware with InniClassic pre-installed as the system launcher. The APK is still available separately for updating an existing JJ Launcher install.
-- **Built-in "iPod Classic" theme** — a bundled, ready-to-use theme aiming for a 1:1 iPod Classic look, plus an **iPod Classic (Dark)** variant with the same layout in an inverted dark palette:
-  - White (or black, in Dark), plain-text iPod-style menu lists (no icons, tight left margin, consistent bold system font)
-  - Two-pane Main Menu and Music menu: menu list on the left, a slowly panning album cover on the right that fills the entire remaining screen edge-to-edge and extends up behind the status bar
-  - The status bar shows the current screen's name (Music/Now Playing/Settings/etc.) instead of a clock, like the real iPod's title bar
-  - Redesigned Now Playing screen: angled album cover with a reflection underneath (toggleable via a new **Album Cover Tilt** setting), centered track info, thick square progress bar
-  - Redesigned Artists/Albums lists: icon-free artist rows, large-cover two-line album rows (bold name + song count), "All Songs" shortcut per artist
-  - A real search screen (title/artist/album) reachable from the Music menu
-  - iPod Classic is the true default theme on first launch (instead of upstream's stock dark theme)
-- **Now Playing depth** — center-click cycles Progress → Seek → Shuffle & Repeat → Rating sub-menus exactly like a real iPod Classic (wheel scrubs the track, cycles shuffle/repeat, or sets a 1–5 star rating depending on the state; reverts to volume control otherwise), plus:
-  - An **On-The-Go playlist** — the classic always-available instant playlist, one tap away from the new Now Playing hold-menu
-  - A **Now Playing hold-menu** (long-press Center): Add to On-The-Go, Browse Album, Browse Artist, Cancel — matching the real iPod's menu, plus a Toggle Visualizer entry for this project's bonus spectrum/lyrics view
-- **Music library depth**:
-  - **Composers** grouping in the Music menu
-  - **Artists** and **Album Artists** are now two separate entries — Artists groups by the literal track artist tag (so features/collaborations show up individually), Album Artists is the original grouped-by-album-artist view — matching real iPod Classic
-  - **Fast-scroll letter jump** — spin the wheel quickly through any alphabetized list to jump straight to the next letter, with an on-screen letter overlay, like a real click wheel
-  - Main Menu cleanup: Cover Flow, Audiobooks, Folders, Years, Recently Added, and My Favorites live in the Music menu, not cluttering the Main Menu, matching real iPod Classic's menu structure
-- **Music Quiz** — a from-scratch recreation of the classic iPod Music Quiz game using your own library, styled in the original's 2000s "Fruitiger Aero" glossy look. Structured into 5 rounds of 8 questions each, with a round-complete checkpoint screen and a distinct victory screen for clearing all 5 rounds (bonus rounds and additional question types are planned but not built yet)
-- **Last.fm scrobbling** — two independent mechanisms, like Rockbox:
-  - A permanent local `.scrobbler.log` in the classic Audioscrobbler 1.1 format
-  - Live scrobbling against the real Last.fm API (`auth.getMobileSession` / `track.updateNowPlaying` / `track.scrobble`), with a browser-based login flow (via the device's Wi-Fi web server) since typing a username/password with a click-wheel is painful
-- **OGG Vorbis support** — playback and library scanning for `.ogg` files, including automatic detection of files that are actually Opus-encoded but saved with an `.ogg` extension (common with some ripping tools)
-- **Bluetooth reliability fix** — some speakers failed to connect because `BLUETOOTH_PRIVILEGED`/`WRITE_SECURE_SETTINGS` are signature-level permissions that simply declaring them in the manifest doesn't grant; now self-granted via a root shell command at startup, alongside the existing AVRCP version fix
-- Assorted library/UI fixes made along the way: duplicate song de-duplication, folder-cover-art fallback for albums without embedded art, album-artist grouping, forced 1:1 album art cropping, OOM hardening for large library scans, track titles no longer show their file extension when a file has no title tag, consistent menu font size across every screen, and the wheel no longer stays active (e.g. changing volume) while the screen is locked
+### Music library
+- **Artists**, **Album Artists**, **Albums**, **Songs**, **Genres**, **Composers**, **Playlists**, **Favorites** — Artists groups by the literal track artist tag (so features/collaborations show up individually), Album Artists is the traditional grouped view
+- Wide format support: MP3, FLAC, WAV, OGG Vorbis, Opus (including `.ogg`-extension Opus files), ALAC/M4A, AAC
+- **Gapless playback** for albums and playlists of 15 tracks or fewer (see [Known limitations](#known-limitations))
+- **Shuffle** row pinned to the top of All Songs, matching stock Y1 firmware
+- Last.fm scrobbling — a local `.scrobbler.log` (Audioscrobbler 1.1 format) plus live scrobbling against the real Last.fm API, with a browser-based login flow since typing credentials with a click wheel is painful
+
+### Beyond music
+- **Podcasts** — subscribe, stream, download for offline listening
+- **FM Radio** — talks to the real hardware tuner directly, no need for the stock radio app
+- **Video playback** — a dedicated Videos folder on the SD card, full-screen playback with wheel-driven volume/seek (see [Known limitations](#known-limitations))
+- **Audiobooks** — bookmarked, resumable playback
+- **Wireless PC Upload** — a small web server for copying music onto the device over Wi-Fi, no cable needed
+
+### Installable two ways
+- **Flashable ROM** (`rom.zip`) via the [Innioasis Updater](https://www.innioasis.com/pages/download) — no ADB required
+- Standalone **APK** for updating an existing install
+
+### Under the hood
+- A round of crash fixes for library browsing (Artists/Albums/Genres), FLAC playback, and the backlight timer not resetting during active use
+- Debloated further — a number of never-used stock Android/MediaTek system apps (Exchange sync, live-wallpaper demos, SIM toolkit, text-to-speech, etc.) can be safely disabled to free up RAM and reduce background CPU/battery use
+- Reduced background CPU wake-ups: the Now Playing progress ticker and the clock/widget refresh loop used to keep doing full work every 500ms–1s even when their screen wasn't visible (or the display was off) — both now sit idle unless actually needed
+
+## Known limitations
+
+- **Gapless playback** only activates for playlists of 15 tracks or fewer, with shuffle off and no FLAC files in the queue. FLAC decoding runs on a separate legacy engine that can't share ExoPlayer's native queue, and very large/shuffled queues (e.g. "All Songs") intentionally keep using the older, proven per-track loading path.
+- **Video playback** is a first implementation — it plays back reliably, but hasn't been optimized yet (large/high-bitrate files, thumbnails in the list, and resume-position are all unaddressed for now).
 
 ## Installation
 
@@ -137,6 +148,10 @@ Last.fm requires every client to use its own API credentials, so none are shippe
    lastfm.api.secret=YOUR_SECRET
    ```
 3. Build as usual (`./gradlew assembleDebug`). Without a key, the app still runs fine — scrobbling simply won't authenticate.
+
+## What's different from upstream JJ Launcher
+
+For anyone tracking this project against [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher): everything in [Features](#features) above was added or substantially changed on top of JJ Launcher. Anything not mentioned there (media scanner internals, EQ, Bluetooth pairing, Wi-Fi keyboard, the custom theme engine, etc.) still works as in the original project — see upstream's documentation for that.
 
 ## Credits & License
 

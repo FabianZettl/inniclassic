@@ -10,6 +10,7 @@ import android.os.PowerManager;
 import android.widget.Toast;
 
 import com.google.android.exoplayer2.DefaultRenderersFactory;
+import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -38,6 +39,10 @@ public class AudioPlayerManager {
     public Y1CrossfeedAudioProcessor crossfeedProcessor = new Y1CrossfeedAudioProcessor();
     public MediaPlayer legacyPlayer;
     public boolean isUsingLegacyPlayer = false;
+    // 🚀 [Gapless 재생] 앨범(또는 15곡 이하 재생목록)일 때만 켜집니다 - ExoPlayer의 네이티브 큐 기능을 써서
+    // 트랙 사이에 정지/재장전 없이 이어지도록 합니다. FLAC은 별도의 legacyPlayer 엔진을 쓰기 때문에
+    // 이 큐에 섞일 수 없어 자동으로 제외됩니다.
+    private boolean isGaplessQueueActive = false;
     private java.io.FileInputStream currentFileInputStream;
 
     private float currentSpeed = 1.0f;
@@ -198,6 +203,27 @@ public class AudioPlayerManager {
                 public void onPlayerError(com.google.android.exoplayer2.ExoPlaybackException error) {
                     if (!isUsingLegacyPlayer) handleTrackError("Cannot play this file.");
                 }
+
+                // 🚀 [Gapless 재생] ExoPlayer가 큐 안에서 자연스럽게(또는 seekToNext/Previous로) 다음 곡으로
+                // 넘어갈 때 호출됩니다 - 이때는 재장전 없이 메타데이터/화면만 갱신하면 됩니다.
+                // PLAYLIST_CHANGED(=setMediaItems 최초 호출)는 playTrackList가 직접 처리하므로 제외합니다.
+                @Override
+                public void onMediaItemTransition(MediaItem mediaItem, int reason) {
+                    if (!isGaplessQueueActive || MainActivity.instance == null) return;
+                    if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
+                            && reason != Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) return;
+
+                    final MainActivity main = MainActivity.instance;
+                    int newIndex = exoPlayer.getCurrentWindowIndex();
+                    if (newIndex < 0 || newIndex >= main.currentPlaylist.size()) return;
+
+                    main.currentIndex = newIndex;
+                    main.lastTrackChangeTime = System.currentTimeMillis();
+                    main.runOnUiThread(() -> {
+                        prepareMusicTrack(newIndex);
+                        main.updatePlayerUI();
+                    });
+                }
             });
         }
     }
@@ -313,8 +339,37 @@ public class AudioPlayerManager {
             exoPlayer.setShuffleModeEnabled(isShuffle);
         }
         main.isPausedByHand = false; // 🚀 스위치를 미리 켜줍니다!
+
+        // 🚀 [Gapless 재생] 앨범(또는 15곡 이하 목록)이고 셔플이 꺼져 있고 FLAC이 섞여있지 않으면
+        // ExoPlayer의 네이티브 큐로 전체 목록을 한 번에 장전해서 트랙 사이에 끊김이 없게 합니다.
+        // 큰 목록(전체 곡 셔플 재생 등)은 기존 방식(트랙별 개별 로드) 그대로 둡니다.
+        isGaplessQueueActive = !isShuffle && shouldUseGaplessQueue(main.currentPlaylist);
+        if (isGaplessQueueActive) {
+            List<MediaItem> mediaItems = new ArrayList<>();
+            for (File f : main.currentPlaylist) {
+                mediaItems.add(MediaItem.fromUri(Uri.fromFile(f)));
+            }
+            if (legacyPlayer != null) { legacyPlayer.stop(); legacyPlayer.reset(); }
+            exoPlayer.stop();
+            exoPlayer.setMediaItems(mediaItems, main.currentIndex, 0);
+            exoPlayer.setShuffleModeEnabled(false);
+            exoPlayer.setPlaybackParameters(new PlaybackParameters(currentSpeed, 1.0f));
+            exoPlayer.prepare();
+            if (!main.isPausedByHand) exoPlayer.setPlayWhenReady(true);
+        }
+
         prepareMusicTrack(main.currentIndex);
         main.updatePlayerUI(); // 🚀 타이머 즉시 시작!
+    }
+
+    // 🚀 [Gapless 재생 조건] 앨범(대부분 15곡 이하)이거나 명시적으로 15곡 이하인 재생목록일 때만 켭니다.
+    // FLAC은 별도의 legacyPlayer 엔진을 쓰기 때문에 ExoPlayer 네이티브 큐에 섞일 수 없어 제외합니다.
+    private boolean shouldUseGaplessQueue(List<File> list) {
+        if (list.size() > 15) return false;
+        for (File f : list) {
+            if (f.getName().toLowerCase().endsWith(".flac")) return false;
+        }
+        return true;
     }
     public void playPodcastStream(String url, String title, String imageUrl, String channelName, int offsetMs) {
         final MainActivity main = MainActivity.instance;
@@ -326,6 +381,7 @@ public class AudioPlayerManager {
             else { exoPlayer.stop(); exoPlayer.clearMediaItems(); }
 
             isUsingLegacyPlayer = false;
+            isGaplessQueueActive = false; // 🚀 팟캐스트는 항상 단일 트랙 모드로 재생합니다.
 
             // 🚀 [핵심 엔진] 스트리밍일 때도 '가짜(Dummy) 플레이리스트'를 만들어 시간을 기록하게 속입니다!
             String safeChannel = channelName.replaceAll("[\\\\/:*?\"<>|]", "_");
@@ -464,6 +520,18 @@ public class AudioPlayerManager {
         MainActivity main = MainActivity.instance;
         if (main == null || main.currentPlaylist.isEmpty()) return;
         main.lastTrackChangeTime = System.currentTimeMillis();
+
+        // 🚀 [Gapless 재생] 큐 안에서 그대로 다음 곡으로 넘어갑니다 - onMediaItemTransition 리스너가
+        // currentIndex 갱신과 화면 새로고침을 알아서 처리하므로 여기서 중복으로 하지 않습니다.
+        if (isGaplessQueueActive && exoPlayer != null) {
+            if (exoPlayer.hasNext()) {
+                exoPlayer.next();
+            } else {
+                exoPlayer.seekTo(0, 0);
+            }
+            return;
+        }
+
         main.currentIndex = (main.currentIndex + 1) % main.currentPlaylist.size();
         prepareMusicTrack(main.currentIndex);
         main.updatePlayerUI();
@@ -474,6 +542,16 @@ public class AudioPlayerManager {
         MainActivity main = MainActivity.instance;
         if (main == null || main.currentPlaylist.isEmpty()) return;
         main.lastTrackChangeTime = System.currentTimeMillis();
+
+        if (isGaplessQueueActive && exoPlayer != null) {
+            if (exoPlayer.hasPrevious()) {
+                exoPlayer.previous();
+            } else {
+                exoPlayer.seekTo(main.currentPlaylist.size() - 1, 0);
+            }
+            return;
+        }
+
         main.currentIndex--;
         if (main.currentIndex < 0) main.currentIndex = main.currentPlaylist.size() - 1;
         prepareMusicTrack(main.currentIndex);
@@ -804,6 +882,12 @@ public class AudioPlayerManager {
                 com.themoon.y1.managers.LastFmScrobbler.getInstance(main)
                         .onTrackStart(pendingScrobbleArtist, pendingScrobbleTitle, pendingScrobbleAlbum, duration, pendingScrobblePath);
 
+            } else if (isGaplessQueueActive) {
+                // 🚀 [Gapless 재생] ExoPlayer가 이미 내부 큐에서 이 트랙으로 넘어가 있는 상태입니다 (직접
+                // 넣어놓은 setMediaItems() 큐를 통해서든, onMediaItemTransition으로 자동으로든) - 여기서
+                // 다시 stop/setMediaSource/prepare를 하면 오히려 끊김이 생기므로, 재장전 없이 그대로
+                // 이어서 재생합니다. 위에서 이미 메타데이터/화면(제목, 아티스트, 커버 등)은 갱신되었습니다.
+                exoPlayer.setPlaybackParameters(new PlaybackParameters(currentSpeed, 1.0f));
             } else {
                 // MP3/WAV: 초고속 ExoPlayer
                 if (legacyPlayer != null) { legacyPlayer.stop(); legacyPlayer.reset(); }

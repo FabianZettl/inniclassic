@@ -322,6 +322,8 @@ public class MainActivity extends Activity {
     private static final int STATE_STORAGE = 9;
     private static final int STATE_WEBSERVER = 10;
     private static final int STATE_MUSIC_QUIZ = 11;
+    private static final int STATE_VIDEOS = 12;
+    private static final int STATE_VIDEO_PLAYER = 13;
     // 💡 미디어 라이브러리 브라우저 상태 관리 변수들
     private static final int BROWSER_ROOT = 0;
     private static final int BROWSER_FOLDER = 1;
@@ -385,6 +387,7 @@ public class MainActivity extends Activity {
     private View scrollViewBrowser;
     private View frameBrowserCover;
     private ImageView ivBrowserCover;
+    private boolean browserCoverPaneSetUp = false; // 🚀 확대/팬 애니메이션 중복 시작 방지
     private boolean isScreenOffControlEnabled = false;
 
     // 🚀 [iPod 스타일] Backlight Timer - 일정 시간 조작이 없으면 자동으로 화면을 끕니다 (0 = Always On)
@@ -432,6 +435,25 @@ public class MainActivity extends Activity {
     private View layoutMusicQuizMode;
     private View layoutPlayerMode, layoutVolumeOverlay;
     private View layoutBrightnessMode, layoutStorageMode, layoutWebServerMode;
+    // 🚀 [신규 추가] Videos 목록 화면 + 전체화면 재생 화면
+    private View layoutVideosMode, layoutVideoPlayerMode;
+    private LinearLayout containerVideoItems;
+    private android.view.SurfaceView surfaceVideo;
+    private TextView tvVideoTitle, tvVideoTimeCurrent, tvVideoTimeTotal, tvVideoModeHint;
+    private ProgressBar videoProgressBar;
+    private List<File> videoLibrary = new ArrayList<>();
+    private int currentVideoIndex = -1;
+    private boolean videoSeekModeActive = false;
+    private long videoCenterDownTime = 0;
+    private boolean isVideoCenterLongPressed = false;
+    private final Handler videoProgressHandler = new Handler();
+    private final Runnable updateVideoProgressTask = new Runnable() {
+        @Override
+        public void run() {
+            updateVideoProgressUI();
+            videoProgressHandler.postDelayed(this, 500);
+        }
+    };
 
     private LinearLayout containerBrowserItems, containerSettingsItems;
     // 🚀 [신규 추가] Music Quiz 게임 화면 전용 뷰들
@@ -572,27 +594,42 @@ public class MainActivity extends Activity {
     private Runnable clockTask = new Runnable() {
         @Override
         public void run() {
-            String timeFormat = is24HourFormat ? "HH:mm" : "hh:mm a";
-            SimpleDateFormat sdf = new SimpleDateFormat(timeFormat, Locale.US);
-            updateStatusBarTitle();
-
-            // 🚀 [라이브 엔진] 프리뷰 내부 시계가 화면에 노출 중(VISIBLE)이라면 매초 실시간으로 시간을 갈아끼워 째깍이게 만듭니다!
-            if (tvFocusPreviewClock != null && tvFocusPreviewClock.getVisibility() == View.VISIBLE) {
-                tvFocusPreviewClock.setText(sdf.format(new Date()));
+            // 🚀 [배터리/성능 최적화] 화면이 가상 암전(isFakeScreenOff) 상태일 때는 화면에 보이는 게
+            // 아무것도 없으므로(완전 블랙) 이 틱 안의 작업을 전부 건너뛰고, 다음 틱 간격도 1초 -> 15초로
+            // 늘려서 CPU가 훨씬 더 오래 쉴 수 있게 합니다 - 백그라운드 음악 재생 중 화면이 꺼져있는 시간이
+            // 실제로 가장 긴 사용 패턴이라 이게 제일 효과가 큽니다.
+            if (isFakeScreenOff) {
+                clockHandler.postDelayed(this, 15000);
+                return;
             }
 
-            // 🚀 [iPod 스타일] Time in Title Bar - 켜져 있으면 브라우저 타이틀 줄 오른쪽에 실시간 시계 표시
-            if (tvBrowserTitleClock != null) {
-                if (isTimeInTitleBar && layoutBrowserMode != null
-                        && layoutBrowserMode.getVisibility() == View.VISIBLE) {
-                    tvBrowserTitleClock.setText(sdf.format(new Date()));
+            // 🚀 [불필요한 작업 제거] updateStatusBarTitle()은 changeScreen()에서 화면이 바뀔 때 이미
+            // 호출됩니다 - 매초 다시 부르는 건 100% 중복 작업이었습니다.
+
+            boolean clockWidgetVisible = tvFocusPreviewClock != null
+                    && tvFocusPreviewClock.getVisibility() == View.VISIBLE;
+            boolean titleClockVisible = isTimeInTitleBar && tvBrowserTitleClock != null
+                    && layoutBrowserMode != null && layoutBrowserMode.getVisibility() == View.VISIBLE;
+
+            // 🚀 시계 위젯이 하나라도 보일 때만 SimpleDateFormat/Date를 만듭니다.
+            if (clockWidgetVisible || titleClockVisible) {
+                String timeFormat = is24HourFormat ? "HH:mm" : "hh:mm a";
+                SimpleDateFormat sdf = new SimpleDateFormat(timeFormat, Locale.US);
+                String nowStr = sdf.format(new Date());
+
+                if (clockWidgetVisible) tvFocusPreviewClock.setText(nowStr);
+                if (titleClockVisible) {
+                    tvBrowserTitleClock.setText(nowStr);
                     tvBrowserTitleClock.setVisibility(View.VISIBLE);
-                } else {
-                    tvBrowserTitleClock.setVisibility(View.GONE);
                 }
             }
+            if (tvBrowserTitleClock != null && !titleClockVisible) {
+                tvBrowserTitleClock.setVisibility(View.GONE);
+            }
 
-            refreshWidgets(); // 홈 스크린 위젯 동시 새로고침
+            // 🚀 위젯들은 전부 Main Menu 전용이므로, 다른 화면일 때는 아예 부르지 않습니다.
+            if (currentScreenState == STATE_MENU) refreshWidgets();
+
             clockHandler.postDelayed(this, 1000);
         }
     };
@@ -779,6 +816,12 @@ public class MainActivity extends Activity {
     private Runnable updateProgressTask = new Runnable() {
         @Override
         public void run() {
+            // 🚀 [배터리/성능 최적화] Now Playing 화면이 안 보일 때(다른 화면을 보면서 백그라운드로 음악만
+            // 재생 중일 때)는 어차피 안 보이는 뷰를 0.5초마다 갱신하는 무거운 작업을 건너뜁니다.
+            if (currentScreenState != STATE_PLAYER) {
+                progressHandler.postDelayed(this, 500);
+                return;
+            }
             try {
                 com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager
                         .getInstance();
@@ -1781,6 +1824,17 @@ public class MainActivity extends Activity {
         tvServerStatus = findViewById(R.id.tv_server_status);
         tvServerIp = findViewById(R.id.tv_server_ip);
         btnServerToggle = findViewById(R.id.btn_server_toggle);
+
+        // 🚀 [신규 추가] Videos 목록 + 전체화면 재생 화면 뷰 연결
+        layoutVideosMode = findViewById(R.id.layout_videos_mode);
+        containerVideoItems = findViewById(R.id.container_video_items);
+        layoutVideoPlayerMode = findViewById(R.id.layout_video_player_mode);
+        surfaceVideo = findViewById(R.id.surface_video);
+        tvVideoTitle = findViewById(R.id.tv_video_title);
+        tvVideoTimeCurrent = findViewById(R.id.tv_video_time_current);
+        tvVideoTimeTotal = findViewById(R.id.tv_video_time_total);
+        tvVideoModeHint = findViewById(R.id.tv_video_mode_hint);
+        videoProgressBar = findViewById(R.id.video_progress);
         try {
             // 🚀 [테마 대응] 제목들도 하드코딩된 거의-흰색 대신 테마 기본 텍스트 색상을 씁니다 -
             // 밝은 테마(예: iPod Classic)의 흰 배경에서 안 보이던 문제 방지!
@@ -1881,11 +1935,11 @@ public class MainActivity extends Activity {
         int bIdx = statusParent.indexOfChild(tvStatusBattery);
 
         float density = getResources().getDisplayMetrics().density;
-        // 🚀 [크기 폭업] 가로 54dp, 세로 24dp로 훨씬 더 크고 시원하게 키웁니다!
+        // 🚀 [상태바 슬림화] 실제 아이팟 상태바(26dp)에 맞춰 30dp x 16dp로 조정 (기존 54x24dp는 너무 두꺼웠습니다)
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                (int) (54 * density), (int) (24 * density));
+                (int) (30 * density), (int) (16 * density));
         blp.gravity = Gravity.CENTER_VERTICAL;
-        blp.setMargins((int) (15 * density), 0, (int) (6 * density), 0); // 커진 만큼 마진도 살짝 조정
+        blp.setMargins((int) (8 * density), 0, (int) (4 * density), 0);
         statusParent.addView(batteryIconView, bIdx, blp);
         ivStatusBluetooth = findViewById(R.id.iv_status_bluetooth);
         ivStatusWifi = findViewById(R.id.iv_status_wifi);
@@ -1900,11 +1954,11 @@ public class MainActivity extends Activity {
         ViewGroup rightStatusGroup = (ViewGroup) ivStatusBluetooth.getParent();
         float statusDensity = getResources().getDisplayMetrics().density;
 
-        // 2. 아이콘 크기를 우측 아이콘들과 완벽하게 동일한 22dp로 맞춥니다.
+        // 2. 아이콘 크기를 우측 아이콘들과 완벽하게 동일한 16dp로 맞춥니다. (🚀 상태바 슬림화, 26dp 기준)
         LinearLayout.LayoutParams playLp = new LinearLayout.LayoutParams(
-                (int) (22 * statusDensity), (int) (22 * statusDensity));
+                (int) (16 * statusDensity), (int) (16 * statusDensity));
         playLp.gravity = Gravity.CENTER_VERTICAL;
-        playLp.setMargins(0, 0, (int) (8 * statusDensity), 0); // 우측 아이콘과의 간격 8dp
+        playLp.setMargins(0, 0, (int) (6 * statusDensity), 0); // 우측 아이콘과의 간격 6dp
 
         // 3. 우측 아이콘 그룹의 맨 앞(인덱스 0)에 쏙 끼워 넣습니다!
         rightStatusGroup.addView(ivStatusPlay, 0, playLp);
@@ -1921,9 +1975,9 @@ public class MainActivity extends Activity {
         ivStatusServer.setVisibility(View.GONE); // 평소엔 끄기
 
         LinearLayout.LayoutParams serverLp = new LinearLayout.LayoutParams(
-                (int) (22 * statusDensity), (int) (22 * statusDensity));
+                (int) (16 * statusDensity), (int) (16 * statusDensity));
         serverLp.gravity = Gravity.CENTER_VERTICAL;
-        serverLp.setMargins(0, 0, (int) (8 * statusDensity), 0); // 우측 아이콘과의 간격 8dp
+        serverLp.setMargins(0, 0, (int) (6 * statusDensity), 0); // 우측 아이콘과의 간격 6dp
 
         rightStatusGroup.addView(ivStatusServer, 0, serverLp); // 재생 아이콘 옆에 나란히 배치!
 
@@ -1953,6 +2007,8 @@ public class MainActivity extends Activity {
         ((View) btnRadio.getParent()).setVisibility(View.VISIBLE);
         Button btnWebServer = findViewById(R.id.btn_webserver);
         tvPlayerTitle = findViewById(R.id.tv_player_title);
+        // 🚀 [긴 제목 마키 스크롤] 제목이 잘릴 만큼 길면 짧은 정지 후 자동으로 좌우 스크롤됩니다.
+        tvPlayerTitle.setSelected(true);
         tvPlayerArtist = findViewById(R.id.tv_player_artist);
         tvPlayerAlbum = findViewById(R.id.tv_player_album);
         tvPlayerTimeCurrent = findViewById(R.id.tv_player_time_current);
@@ -2137,10 +2193,13 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT));
         verticalWrapper.addView(statusIconsLayout);
 
+        // 🚀 [Reddit 피드백] 즐겨찾기 여부가 아예 안 보인다는 지적 - 이제 항상 보이는 하트로,
+        // 즐겨찾기가 아니면 빈 하트(♡), 즐겨찾기면 채워진 빨간 하트(♥)로 한눈에 구분됩니다.
         tvPlayerFavoriteStatus = new TextView(this);
-        tvPlayerFavoriteStatus.setText("♥");
+        tvPlayerFavoriteStatus.setText("♡");
         tvPlayerFavoriteStatus.setTextSize(20);
-        tvPlayerFavoriteStatus.setVisibility(View.GONE);
+        tvPlayerFavoriteStatus.setTextColor(0xFFAAAAAA);
+        tvPlayerFavoriteStatus.setVisibility(View.VISIBLE);
 
         LinearLayout.LayoutParams heartLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -3822,6 +3881,11 @@ public class MainActivity extends Activity {
             title = t("Wi-Fi");
         } else if (currentScreenState == STATE_MUSIC_QUIZ) {
             title = t("Music Quiz");
+        } else if (currentScreenState == STATE_VIDEOS) {
+            title = t("Videos");
+        } else if (currentScreenState == STATE_MENU) {
+            // 🚀 [iPod 스타일] 실제 아이팟처럼 메인 메뉴 좌상단에 "iPod"라고 표시합니다
+            title = "iPod";
         } else {
             title = "";
         }
@@ -3866,6 +3930,15 @@ public class MainActivity extends Activity {
         layoutStorageMode.setVisibility(state == STATE_STORAGE ? View.VISIBLE : View.GONE);
         layoutWebServerMode.setVisibility(state == STATE_WEBSERVER ? View.VISIBLE : View.GONE);
         layoutMusicQuizMode.setVisibility(state == STATE_MUSIC_QUIZ ? View.VISIBLE : View.GONE);
+        layoutVideosMode.setVisibility(state == STATE_VIDEOS ? View.VISIBLE : View.GONE);
+        layoutVideoPlayerMode.setVisibility(state == STATE_VIDEO_PLAYER ? View.VISIBLE : View.GONE);
+        if (state != STATE_VIDEO_PLAYER) {
+            // 🚀 다른 화면으로 나가면 재생을 멈추고 진행률 갱신 루프도 정지시켜 배터리/자원을 아낍니다.
+            videoProgressHandler.removeCallbacks(updateVideoProgressTask);
+            com.themoon.y1.managers.VideoPlayerManager.getInstance().stopAndRelease();
+            videoSeekModeActive = false;
+            if (tvVideoModeHint != null) tvVideoModeHint.setVisibility(View.GONE);
+        }
         layoutVolumeOverlay.setVisibility(View.GONE);
 
         View statusBar = findViewById(R.id.layout_status_bar);
@@ -3873,8 +3946,8 @@ public class MainActivity extends Activity {
             // 🚀 [지능형 상태바 개방 엔진]
             // 커버 플로우 페이지(BROWSER_COVER_FLOW)일 때만 테마 설정을 무시하고 상태 표시줄을 '완전 투명'으로 밀어버립니다.
             // (Now Playing은 상단 바에 "Now Playing" 타이틀을 보여줘야 하므로 회색 배경을 유지합니다!)
-            if (state == STATE_BROWSER && currentBrowserMode == BROWSER_COVER_FLOW) {
-                statusBar.setBackgroundColor(0x00000000); // ☀️ 완전 투명 장전
+            if ((state == STATE_BROWSER && currentBrowserMode == BROWSER_COVER_FLOW) || state == STATE_VIDEO_PLAYER) {
+                statusBar.setBackgroundColor(0x00000000); // ☀️ 완전 투명 장전 (비디오 전체화면도 동일하게 상태바를 숨깁니다)
             } else {
                 // 메인 메뉴, 설정, 와이파이 등 그 외의 일반 페이지로 복귀할 때는 테마 고유의 설정 색상으로 안전하게 복원!
                 statusBar.setBackground(createStatusBarBackground());
@@ -5329,8 +5402,10 @@ public class MainActivity extends Activity {
         rowButton.setSoundEffectsEnabled(false);
         rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
 
-        int padLeft = (int) (14 * d);
-        int padTopBottom = (int) (12 * d);
+        // 🚀 [간격 통일] 실제 아이팟처럼 촘촘하게 - 모든 목록 화면(곡/앨범/아티스트 등)에서 동일한 여백 사용!
+        // 🚀 [좌측 정렬] 상태바 타이틀과 동일한 8dp에서 시작하도록 왼쪽 여백을 맞춥니다.
+        int padLeft = (int) (8 * d);
+        int padTopBottom = (int) (6 * d);
         int padRight = (int) (10 * d);
         rowButton.setPadding(padLeft, padTopBottom, padRight, padTopBottom);
 
@@ -5367,7 +5442,7 @@ public class MainActivity extends Activity {
         final TextView tvText = new TextView(this);
         tvText.setText(textLabel);
         // 🚀 [Main Menu와 폰트 크기 통일] SP 대신 PX(px) 단위로 강제 고정 - Main Menu 동적 버튼과 100% 동일한 렌더링 크기 보장!
-        tvText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * d);
+        tvText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 21f * d);
         tvText.setTextColor(normalColor); // 🚀 텍스트도 똑같이 도색!
         tvText.setTypeface(ThemeManager.getCustomFontBold());
 
@@ -5384,7 +5459,7 @@ public class MainActivity extends Activity {
         // 🚀 [iPod 스타일] 화살표(〉)는 평소엔 숨겨져 있다가, 포커스가 닿았을 때만 흰색으로 나타납니다
         final TextView tvArrow = new TextView(this);
         tvArrow.setText("〉");
-        tvArrow.setTextSize(16f);
+        tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 20f * d);
         tvArrow.setTextColor(0xFFFFFFFF);
         tvArrow.setVisibility(View.GONE);
         LinearLayout.LayoutParams arrowLp = new LinearLayout.LayoutParams(
@@ -5428,15 +5503,16 @@ public class MainActivity extends Activity {
         btn.setTypeface(ThemeManager.getCustomFontBold());
         btn.setSoundEffectsEnabled(false);
         btn.setText(t(text));
-        btn.setTextSize(18);
+        btn.setTextSize(21);
         btn.setTextColor(ThemeManager.getTextColorPrimary());
 
         btn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
 
-        // 🚀 [수정] 메뉴 전체와 통일: 텍스트가 왼쪽 끝에 훨씬 더 가깝게 시작하도록 여백을 좁힙니다!
+        // 🚀 [간격 통일] 모든 메뉴(설정/블루투스/Wi-Fi/테마 등)에서 실제 아이팟처럼 촘촘한 줄 간격으로 통일!
+        // 🚀 [좌측 정렬] 상태바 타이틀과 동일한 8dp에서 시작하도록 왼쪽 여백을 맞춥니다.
         float density = getResources().getDisplayMetrics().density;
-        int padLeft = (int) (14 * density);
-        int padTopBottom = (int) (12 * density);
+        int padLeft = (int) (8 * density);
+        int padTopBottom = (int) (6 * density);
         int padRight = (int) (10 * density);
         btn.setPadding(padLeft, padTopBottom, padRight, padTopBottom);
 
@@ -7100,6 +7176,111 @@ public class MainActivity extends Activity {
         });
     }
 
+    // 🚀 [신규 추가] Videos 메뉴 - 실제 아이팟처럼 전용 폴더(/storage/sdcard0/Videos)만 스캔합니다.
+    private void scanVideoLibrary() {
+        videoLibrary.clear();
+        File videoDir = new File("/storage/sdcard0/Videos");
+        if (!videoDir.exists()) {
+            videoDir.mkdirs();
+            return;
+        }
+        File[] files = videoDir.listFiles();
+        if (files == null) return;
+        String[] videoExts = {".mp4", ".mkv", ".webm", ".m4v", ".3gp"};
+        for (File f : files) {
+            if (!f.isFile()) continue;
+            String lower = f.getName().toLowerCase();
+            for (String ext : videoExts) {
+                if (lower.endsWith(ext)) {
+                    videoLibrary.add(f);
+                    break;
+                }
+            }
+        }
+        java.util.Collections.sort(videoLibrary, new java.util.Comparator<File>() {
+            @Override
+            public int compare(File a, File b) {
+                return a.getName().compareToIgnoreCase(b.getName());
+            }
+        });
+    }
+
+    private void buildVideoListUI() {
+        if (containerVideoItems == null) return;
+        scanVideoLibrary();
+        containerVideoItems.removeAllViews();
+
+        if (videoLibrary.isEmpty()) {
+            TextView tvEmpty = new TextView(this);
+            tvEmpty.setText(t("No videos found.\nCopy videos into the \"Videos\" folder on your SD card."));
+            tvEmpty.setTextSize(16f);
+            tvEmpty.setTextColor(ThemeManager.getTextColorSecondary());
+            tvEmpty.setGravity(Gravity.CENTER);
+            tvEmpty.setPadding(0, 50, 0, 0);
+            containerVideoItems.addView(tvEmpty);
+            return;
+        }
+
+        for (int i = 0; i < videoLibrary.size(); i++) {
+            final int index = i;
+            final File videoFile = videoLibrary.get(i);
+            String title = videoFile.getName();
+            int dot = title.lastIndexOf(".");
+            if (dot > 0) title = title.substring(0, dot);
+
+            View row = createListButtonWithIcon("", title);
+            row.setOnClickListener(v -> {
+                clickFeedback();
+                openVideoPlayer(index);
+            });
+            containerVideoItems.addView(row);
+        }
+    }
+
+    private void openVideoPlayer(int index) {
+        if (index < 0 || index >= videoLibrary.size() || surfaceVideo == null) return;
+        currentVideoIndex = index;
+        File videoFile = videoLibrary.get(index);
+
+        changeScreen(STATE_VIDEO_PLAYER);
+
+        String title = videoFile.getName();
+        int dot = title.lastIndexOf(".");
+        if (dot > 0) title = title.substring(0, dot);
+        if (tvVideoTitle != null) tvVideoTitle.setText(title);
+
+        videoSeekModeActive = false;
+        if (tvVideoModeHint != null) tvVideoModeHint.setVisibility(View.GONE);
+
+        com.themoon.y1.managers.VideoPlayerManager.getInstance().playVideo(this, videoFile, surfaceVideo);
+        videoProgressHandler.removeCallbacks(updateVideoProgressTask);
+        videoProgressHandler.post(updateVideoProgressTask);
+    }
+
+    private void updateVideoProgressUI() {
+        com.themoon.y1.managers.VideoPlayerManager vm = com.themoon.y1.managers.VideoPlayerManager.getInstance();
+        int pos = (int) vm.getCurrentPosition();
+        int dur = (int) vm.getDuration();
+
+        if (tvVideoTimeCurrent != null) tvVideoTimeCurrent.setText(formatTime(pos));
+        if (tvVideoTimeTotal != null) tvVideoTimeTotal.setText("-" + formatTime(Math.max(0, dur - pos)));
+        if (videoProgressBar != null && dur > 0) {
+            videoProgressBar.setProgress((int) (((long) pos * 100) / dur));
+        }
+    }
+
+    // 🚀 [탐색/볼륨 모드 전환] 비디오 재생 중 길게 누르면 휠의 역할을 바꿉니다 (탐색 <-> 볼륨).
+    private void toggleVideoSeekMode() {
+        videoSeekModeActive = !videoSeekModeActive;
+        if (tvVideoModeHint != null) {
+            tvVideoModeHint.setText(videoSeekModeActive ? t("Seek Mode") : t("Volume Mode"));
+            tvVideoModeHint.setVisibility(View.VISIBLE);
+            videoProgressHandler.postDelayed(() -> {
+                if (tvVideoModeHint != null) tvVideoModeHint.setVisibility(View.GONE);
+            }, 1200);
+        }
+    }
+
     // 💡 2. 라이브러리 메인 라우터 (자체 스캔 버튼 적용)
     // 💡 기존 코드 수정
     // 🚀 [신규 추가] Music 루트 메뉴 전용 - 우측에 앨범 커버를 보여주는 분할 화면 켜기/끄기
@@ -7110,9 +7291,34 @@ public class MainActivity extends Activity {
         View statusBar = findViewById(R.id.layout_status_bar);
         if (statusBar != null) {
             ViewGroup.LayoutParams slp = statusBar.getLayoutParams();
-            slp.width = getResources().getDisplayMetrics().widthPixels / 2;
+            slp.width = (int) (242 * getResources().getDisplayMetrics().density);
             statusBar.setLayoutParams(slp);
         }
+
+        // 🚀 [Main Menu와 완전히 동일한 룩] 커버가 살짝 확대된 채로 천천히 이동하는 Ken-Burns 팬 애니메이션을
+        // Main Menu의 widget_animated_cover와 똑같이 재현합니다 - 한 번만 설정하면 되므로 중복 시작을 막습니다.
+        if (!browserCoverPaneSetUp && ivBrowserCover != null && frameBrowserCover != null) {
+            browserCoverPaneSetUp = true;
+            frameBrowserCover.post(new Runnable() {
+                @Override
+                public void run() {
+                    int contW = frameBrowserCover.getWidth();
+                    int contH = frameBrowserCover.getHeight();
+                    if (contW <= 0 || contH <= 0) return;
+
+                    int overW = (int) (contW * 1.35f);
+                    int overH = (int) (contH * 1.35f);
+
+                    ivBrowserCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(overW, overH);
+                    lp.gravity = Gravity.CENTER;
+                    ivBrowserCover.setLayoutParams(lp);
+
+                    startCoverPanAnimation(ivBrowserCover, overW - contW, overH - contH);
+                }
+            });
+        }
+
         refreshWidgets();
     }
 
@@ -9435,6 +9641,16 @@ public class MainActivity extends Activity {
     // 🚀 [추가 도구 3] JSON의 X, Y, 너비, 높이, 정렬을 받아서 절대 좌표 세팅값으로 바꿔주는 공장!
     private FrameLayout.LayoutParams createDynamicLayoutParams(ThemeManager.MenuElement el,
             float density) {
+        return createDynamicLayoutParams(el, density, 0);
+    }
+
+    // 🚀 [상태바 오버레이 버그 수정] 실제 아이팟은 상태바(시계/배터리) 여백이 왼쪽 메뉴 목록에만 적용되고,
+    // 오른쪽 커버/이미지 패널은 화면 맨 위까지 그대로 뚫려서 상태바 "뒤"로 깔립니다. 예전에는 캔버스
+    // 전체(mainMenu)에 상태바 높이만큼 paddingTop을 줘서 목록과 커버가 똑같이 밀려 내려갔었는데,
+    // 이제 이 추가 오프셋은 main_scroll_list(목록 상자)에만 넘겨주고 나머지 위젯(커버 등)은 JSON에
+    // 적힌 y값 그대로(0이면 진짜 화면 맨 위) 렌더링합니다.
+    private FrameLayout.LayoutParams createDynamicLayoutParams(ThemeManager.MenuElement el,
+            float density, int extraTopOffset) {
         int w = el.width > 0 ? (int) (el.width * density) : FrameLayout.LayoutParams.WRAP_CONTENT;
         int h = el.height > 0 ? (int) (el.height * density) : FrameLayout.LayoutParams.WRAP_CONTENT;
 
@@ -9450,7 +9666,7 @@ public class MainActivity extends Activity {
         if ((lp.gravity & Gravity.BOTTOM) == Gravity.BOTTOM)
             lp.bottomMargin = (int) (el.y * density);
         else
-            lp.topMargin = (int) (el.y * density);
+            lp.topMargin = (int) (el.y * density) + extraTopOffset;
 
         return lp;
     }
@@ -9492,17 +9708,26 @@ public class MainActivity extends Activity {
         final int safeMenuIndex = lastMainMenuFocusIndex;
 
         ViewGroup mainMenu = (ViewGroup) layoutMainMenu;
-        // 🚀 [상태바 보호막 가동!!]
-        // 기존 XML 뼈대에 있던 '상단 여백(상태바 높이)'을 알아냅니다.
-        int safeTopPadding = mainMenu.getPaddingTop();
+        // 🚀 [상태바 오버레이 버그 수정] 실제 아이팟은 상태바 여백이 왼쪽 메뉴 목록에만 적용되고 오른쪽
+        // 커버 패널은 화면 맨 위까지 뚫려서 상태바 뒤로 깔립니다. 예전에는 mainMenu 전체에 paddingTop을
+        // 줘서 캔버스에 담긴 모든 위젯(커버 포함)이 똑같이 밀려 내려갔었습니다 - 이제 mainMenu 자체는
+        // 패딩 없이(0) 두고, 목록 상자에만 이 오프셋을 개별적으로 넘겨줍니다 (아래 list_box 생성 부분 참고).
+        // 💡 [안정성] layout_status_bar의 실제 높이를 실시간으로 되읽으면 아직 레이아웃 패스가 안 끝났을 때
+        // 0을 읽어버려 목록이 위로 붙어버리는(상태바 밑에 안 맞춰지는) 버그가 생깁니다 - activity_main.xml에
+        // 정의된 고정값(26dp)을 그대로 상수로 씁니다. XML의 layout_status_bar 높이를 바꾸면 이 값도 같이 바꿔주세요!
+        final int statusBarHeightDp = 26;
+        int safeTopPadding = (int) (statusBarHeightDp * getResources().getDisplayMetrics().density);
 
-        // 만약 기존 여백을 못 불러왔다면, 안드로이드 기본 상태바 높이인 24dp로 강제 방어막을 칩니다!
-        if (safeTopPadding == 0) {
-            safeTopPadding = (int) (24 * getResources().getDisplayMetrics().density);
+        mainMenu.setPadding(0, 0, 0, 0);
+
+        // 🚀 [방어 코드] 메인 메뉴에서는 상태바 폭을 좌측 메뉴 영역만큼만 좁혀서 오른쪽 커버가 뚫리도록 합니다 -
+        // changeScreen()에서도 이미 처리하지만, 호출 순서와 무관하게 항상 맞도록 여기서도 다시 한번 강제합니다.
+        View statusBarForWidth = findViewById(R.id.layout_status_bar);
+        if (statusBarForWidth != null) {
+            ViewGroup.LayoutParams slpMenu = statusBarForWidth.getLayoutParams();
+            slpMenu.width = (int) (242 * getResources().getDisplayMetrics().density);
+            statusBarForWidth.setLayoutParams(slpMenu);
         }
-
-        // 좌(0), 상단(보호막), 우(0), 하단(0) 으로 패딩을 다시 설정합니다.
-        mainMenu.setPadding(0, safeTopPadding, 0, 0);
 
         for (int i = 0; i < mainMenu.getChildCount(); i++) {
             mainMenu.getChildAt(i).setVisibility(View.GONE);
@@ -9566,7 +9791,9 @@ public class MainActivity extends Activity {
 
             if (el.type.equals("list_box")) {
                 final ScrollView sv = new ScrollView(this);
-                sv.setLayoutParams(createDynamicLayoutParams(el, density));
+                // 🚀 [상태바 오버레이 버그 수정] 목록 상자만 상태바 높이만큼 아래로 내립니다 - 나머지
+                // 위젯(오른쪽 커버 등)은 그대로 화면 맨 위부터 그려져서 상태바 뒤로 자연스럽게 깔립니다.
+                sv.setLayoutParams(createDynamicLayoutParams(el, density, safeTopPadding));
                 sv.setVerticalScrollBarEnabled(false);
                 sv.setFocusable(false);
                 sv.setFocusableInTouchMode(false);
@@ -9595,6 +9822,20 @@ public class MainActivity extends Activity {
                 canvas.addView(sv);
                 listContainers.put(el.id, innerLayout);
                 createdWidgetView = sv;
+
+                // 🚀 [떠 있는 느낌] 왼쪽 메뉴 목록이 오른쪽 커버 위에 살짝 떠 있는 것처럼, 목록 오른쪽
+                // 가장자리에 은은한 그림자를 드리웁니다 (실제 아이팟 메인 메뉴의 입체감).
+                View listShadow = new View(this);
+                GradientDrawable shadowGradient = new GradientDrawable(
+                        GradientDrawable.Orientation.LEFT_RIGHT,
+                        new int[]{0x50000000, 0x00000000});
+                listShadow.setBackground(shadowGradient);
+                int shadowWidth = (int) (10 * density);
+                FrameLayout.LayoutParams shadowLp = new FrameLayout.LayoutParams(
+                        shadowWidth, (int) (el.height * density));
+                shadowLp.leftMargin = (int) ((el.x + el.width) * density);
+                shadowLp.topMargin = (int) (el.y * density) + safeTopPadding;
+                canvas.addView(listShadow, shadowLp);
             } else if (el.type.equals("box")) {
                 ImageView boxView = new ImageView(this);
                 boxView.setLayoutParams(createDynamicLayoutParams(el, density));
@@ -9895,7 +10136,8 @@ public class MainActivity extends Activity {
                     int verticalPad = el.padding > 0 ? customPad : (int) (15 * density);
                     btn.setPadding(customPad, verticalPad, customPad, verticalPad);
                 } else {
-                    int horizontalPad = el.padding > 0 ? customPad : (int) (14 * density);
+                    // 🚀 [좌측 정렬] 상태바 타이틀과 동일한 8dp에서 시작하도록 왼쪽 여백을 맞춥니다.
+                    int horizontalPad = el.padding > 0 ? customPad : (int) (8 * density);
                     btn.setPadding(horizontalPad, customPad, horizontalPad, customPad);
                 }
             }
@@ -9959,6 +10201,8 @@ public class MainActivity extends Activity {
                         tvMain.setText(t(el.textNormal));
                         tvMain.setTextColor(ThemeManager.getTextColorPrimary());
                         tvRight.setText(el.textRight != null ? t(el.textRight) : "");
+                        // 🚀 [실제 아이팟 스타일] 화살표는 포커스된(파란) 줄에서만 보이고, 평소엔 완전히 숨깁니다!
+                        tvRight.setVisibility(View.GONE);
 
                         if (el.textRightColor != null && !el.textRightColor.isEmpty()) {
                             try {
@@ -10010,6 +10254,8 @@ public class MainActivity extends Activity {
                         } else {
                             // 🚀 포커스 시 메인 글자와 우측 화살표 색상 동시 변경!
                             tvMain.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                            // 🚀 [실제 아이팟 스타일] 포커스된 줄에서만 화살표를 보여줍니다.
+                            tvRight.setVisibility(View.VISIBLE);
                             // 🚀 우측 텍스트 전용 포커스 색상 적용
                             if (el.textRightFocusedColor != null && !el.textRightFocusedColor.isEmpty()) {
                                 try {
@@ -10173,6 +10419,11 @@ public class MainActivity extends Activity {
                             changeScreen(STATE_SETTINGS);
                             buildRadioUI();
                             isNavigatingToSubMenu = false;
+                            break;
+                        case "OPEN_VIDEOS":
+                            clickFeedback();
+                            changeScreen(STATE_VIDEOS);
+                            buildVideoListUI();
                             break;
                         // 🚀🚀🚀 [여기서부터 새로 추가된 다이렉트 숏컷 액션들!] 🚀🚀🚀
                         case "OPEN_ROOT_FOLDER":
@@ -10730,12 +10981,16 @@ public class MainActivity extends Activity {
                 }
             }
             if (tvPlayerFavoriteStatus != null) {
+                // 🚀 [Reddit 피드백] 하트를 숨기는 대신 항상 보여주고, 채워짐/빈 상태와 색으로 구분합니다.
                 if (!currentPlaylist.isEmpty()
                         && favoritePaths.contains(currentPlaylist.get(currentIndex).getAbsolutePath())) {
-                    tvPlayerFavoriteStatus.setVisibility(View.VISIBLE);
+                    tvPlayerFavoriteStatus.setText("♥");
+                    tvPlayerFavoriteStatus.setTextColor(0xFFE0546C);
                 } else {
-                    tvPlayerFavoriteStatus.setVisibility(View.GONE);
+                    tvPlayerFavoriteStatus.setText("♡");
+                    tvPlayerFavoriteStatus.setTextColor(0xFFAAAAAA);
                 }
+                tvPlayerFavoriteStatus.setVisibility(View.VISIBLE);
             }
         } catch (Exception e) {
         }
@@ -11323,6 +11578,15 @@ public class MainActivity extends Activity {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
                 // 🚀 [복귀 경로 지정]
                 changeScreen(backTargetForUtility);
+                clickFeedback();
+                return true;
+            }
+            return true;
+        }
+
+        if (currentScreenState == STATE_VIDEOS) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                changeScreen(STATE_MENU);
                 clickFeedback();
                 return true;
             }
@@ -11976,6 +12240,50 @@ public class MainActivity extends Activity {
                 }
             }
             return true;
+        }
+
+        // =======================================================
+        // 🎬 [신규 추가] 비디오 재생 화면 전용 - 다른 상태들의 복잡한 휠/센터 로직과 절대 얽히지 않도록
+        // 여기서 완전히 독립적으로, 가장 먼저 처리하고 return 합니다.
+        // =======================================================
+        if (currentScreenState == STATE_VIDEO_PLAYER) {
+            if (keyCode == 21 || keyCode == 22) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    if (videoSeekModeActive) {
+                        com.themoon.y1.managers.VideoPlayerManager.getInstance().seekRelative(keyCode == 22 ? 10000 : -10000);
+                    } else {
+                        adjustVolume(keyCode == 22);
+                    }
+                    clickFeedback();
+                }
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    if (event.getRepeatCount() == 0) {
+                        videoCenterDownTime = System.currentTimeMillis();
+                        isVideoCenterLongPressed = false;
+                    } else if (System.currentTimeMillis() - videoCenterDownTime > 500 && !isVideoCenterLongPressed) {
+                        isVideoCenterLongPressed = true;
+                        clickFeedback();
+                        toggleVideoSeekMode();
+                    }
+                } else if (action == KeyEvent.ACTION_UP) {
+                    if (!isVideoCenterLongPressed) {
+                        clickFeedback();
+                        com.themoon.y1.managers.VideoPlayerManager.getInstance().togglePlayPause();
+                    }
+                    isVideoCenterLongPressed = false;
+                }
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    clickFeedback();
+                    changeScreen(STATE_VIDEOS);
+                }
+                return true;
+            }
         }
 
         // =======================================================

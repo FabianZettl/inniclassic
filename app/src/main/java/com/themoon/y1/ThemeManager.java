@@ -49,6 +49,9 @@ public class ThemeManager {
     public static class ThemeData {
         public String folderPath, name, bgImage; // 🚀 [추가] bgImage 변수 신설
         public android.graphics.Typeface customFont;
+        // 🚀 [진짜 볼드체] 폰트 파일 자체에 Bold 웨이트가 있으면 이걸 씁니다 - 없으면 null로 두고
+        // getCustomFontBold()가 기존처럼 합성(faux) 볼드로 대체합니다.
+        public android.graphics.Typeface customFontBold;
         public int textPrimary, textSecondary;
         public int bgOverlay, statusBarBg;
         public int btnNormal, btnFocused, btnFocusedText, buttonRadius;
@@ -59,6 +62,7 @@ public class ThemeManager {
                          int btnNormal, int btnFocused, int btnFocusedText, int buttonRadius) {
             this.folderPath = folderPath; this.name = name; this.bgImage = bgImage; // 🚀 생성자 매핑
             this.customFont = customFont;
+            this.customFontBold = null;
             this.textPrimary = textPrimary; this.textSecondary = textSecondary;
             this.bgOverlay = bgOverlay; this.statusBarBg = statusBarBg;
             this.btnNormal = btnNormal; this.btnFocused = btnFocused;
@@ -134,16 +138,19 @@ public class ThemeManager {
         defaultTheme.menuElements.add(new MenuElement("btn_coverflow", "button", "main_scroll_list", "", 0, 8, -1, 48, "Cover Flow", "Cover Flow", "〉", "", "", "", "", "cover.png", "OPEN_COVER_FLOW", "top|left", -1, 1, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
         defaultTheme.menuElements.add(new MenuElement("btn_music", "button", "main_scroll_list", "", 0, 8, -1, 48, "Music", "Music", "〉", "", "", "", "", "music_list.png", "OPEN_BROWSER", "top|left", -1, 2, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
 
-// 🚀 [신규 추가] Playlists 다이렉트 숏컷 (포커스 인덱스: 2번)
-        defaultTheme.menuElements.add(new MenuElement("btn_playlist", "button", "main_scroll_list", "", 0, 8, -1, 48, "Playlists", "Playlists", "〉", "", "", "", "", "playlist.png", "OPEN_PLAYLISTS", "top|left", -1, 3, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        // 🚀 [신규 추가] Videos 다이렉트 숏컷
+        defaultTheme.menuElements.add(new MenuElement("btn_videos", "button", "main_scroll_list", "", 0, 8, -1, 48, "Videos", "Videos", "〉", "", "", "", "", "cover.png", "OPEN_VIDEOS", "top|left", -1, 3, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
 
-        defaultTheme.menuElements.add(new MenuElement("btn_radio", "button", "main_scroll_list", "", 0, 8, -1, 48, "Radio", "Radio", "〉", "", "", "", "", "radio_circle.png", "OPEN_RADIO", "top|left", -1, 4, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_audiobook", "button", "main_scroll_list", "", 0, 8, -1, 48, "Audiobooks", "Audiobooks", "〉", "", "", "", "", "book.png", "OPEN_AUDIOBOOKS", "top|left", -1, 5, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_podcast", "button", "main_scroll_list", "", 0, 8, -1, 48, "Podcasts", "Podcasts", "〉", "", "", "", "", "icon_podcast.png", "OPEN_PODCASTS", "top|left", -1, 6, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_bt", "button", "main_scroll_list", "", 0, 8, -1, 48, "Bluetooth", "Bluetooth", "〉", "", "", "", "", "bluetooth_circle.png", "OPEN_BLUETOOTH", "top|left", -1, 7, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_wifi", "button", "main_scroll_list", "", 0, 8, -1, 48, "Wi-Fi", "Wi-Fi", "〉", "", "", "", "", "wifi_circle.png", "OPEN_WIFI", "top|left", -1, 8, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_set", "button", "main_scroll_list", "", 0, 8, -1, 48, "Settings", "Settings", "〉", "", "", "", "", "setting_circle.png", "OPEN_SETTINGS", "top|left", -1, 9, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_web", "button", "main_scroll_list", "", 0, 8, -1, 48, "PC Upload", "PC Upload", "〉", "", "", "", "", "file_sync.png", "OPEN_WEBSERVER", "top|left", -1, 10, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+// 🚀 [신규 추가] Playlists 다이렉트 숏컷 (포커스 인덱스: 2번)
+        defaultTheme.menuElements.add(new MenuElement("btn_playlist", "button", "main_scroll_list", "", 0, 8, -1, 48, "Playlists", "Playlists", "〉", "", "", "", "", "playlist.png", "OPEN_PLAYLISTS", "top|left", -1, 4, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+
+        defaultTheme.menuElements.add(new MenuElement("btn_radio", "button", "main_scroll_list", "", 0, 8, -1, 48, "Radio", "Radio", "〉", "", "", "", "", "radio_circle.png", "OPEN_RADIO", "top|left", -1, 5, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_audiobook", "button", "main_scroll_list", "", 0, 8, -1, 48, "Audiobooks", "Audiobooks", "〉", "", "", "", "", "book.png", "OPEN_AUDIOBOOKS", "top|left", -1, 6, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_podcast", "button", "main_scroll_list", "", 0, 8, -1, 48, "Podcasts", "Podcasts", "〉", "", "", "", "", "icon_podcast.png", "OPEN_PODCASTS", "top|left", -1, 7, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_bt", "button", "main_scroll_list", "", 0, 8, -1, 48, "Bluetooth", "Bluetooth", "〉", "", "", "", "", "bluetooth_circle.png", "OPEN_BLUETOOTH", "top|left", -1, 8, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_wifi", "button", "main_scroll_list", "", 0, 8, -1, 48, "Wi-Fi", "Wi-Fi", "〉", "", "", "", "", "wifi_circle.png", "OPEN_WIFI", "top|left", -1, 9, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_set", "button", "main_scroll_list", "", 0, 8, -1, 48, "Settings", "Settings", "〉", "", "", "", "", "setting_circle.png", "OPEN_SETTINGS", "top|left", -1, 10, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_web", "button", "main_scroll_list", "", 0, 8, -1, 48, "PC Upload", "PC Upload", "〉", "", "", "", "", "file_sync.png", "OPEN_WEBSERVER", "top|left", -1, 11, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
         // 3. 우측 포커스 연동형 다이내믹 위젯 세트
         defaultTheme.menuElements.add(new MenuElement("widget_clock", "widget_clock", "", "btn_now", 284, 18, 150, 81, "", "", "", "", "", "", "", "", "NONE", "top|left", 0, -1, 16, -1, "bottom", "left", "", 8, 0, 0, 1.0f));
         defaultTheme.menuElements.add(new MenuElement("widget_album", "widget_album", "", "btn_now", 254, 13, 211, 212, "", "", "", "", "", "", "", "", "NONE", "bottom|left", -1, -1, 16, 12, "bottom", "center", "", 0, 0, 0, 1.0f));
@@ -233,6 +240,16 @@ public class ThemeManager {
                                 }
                             }
 
+                            // 🚀 [진짜 볼드체] "fontBold" 키로 진짜 Bold 폰트 파일이 지정되어 있으면 로드합니다.
+                            // 없으면 null로 두어 getCustomFontBold()가 합성 볼드로 대체하도록 합니다.
+                            android.graphics.Typeface parsedFontBold = null;
+                            if (json.has("fontBold")) {
+                                File fontBoldFile = new File(subFolder, json.getString("fontBold"));
+                                if (fontBoldFile.exists() && fontBoldFile.isFile()) {
+                                    try { parsedFontBold = android.graphics.Typeface.createFromFile(fontBoldFile); } catch (Exception e) {}
+                                }
+                            }
+
                             // 🚀 [추가] JSON에서 "bg_image" 값을 읽어옵니다. (안 적혀있으면 빈칸)
                             String parsedBgImage = json.optString("bg_image", "");
 
@@ -246,6 +263,7 @@ public class ThemeManager {
                                     parsedBtnNormal, parsedBtnFocused, parsedBtnFocusedText,
                                     parsedRadius
                             );
+                            theme.customFontBold = parsedFontBold;
 
                             if (json.has("main_menu")) {
                                 JSONArray menuArray = json.getJSONArray("main_menu");
@@ -318,6 +336,13 @@ public class ThemeManager {
     private static android.graphics.Typeface cachedBoldFontSource;
 
     public static android.graphics.Typeface getCustomFontBold() {
+        // 🚀 [진짜 볼드체] 테마가 진짜 Bold 폰트 파일을 제공하면 그걸 그대로 씁니다 - 합성(faux) 볼드보다
+        // 훨씬 또렷하고 실제 아이팟 굵기에 가깝습니다.
+        if (!availableThemes.isEmpty()) {
+            android.graphics.Typeface realBold = getCurrentTheme().customFontBold;
+            if (realBold != null) return realBold;
+        }
+
         android.graphics.Typeface base = getCustomFont();
         if (cachedBoldFont == null || cachedBoldFontSource != base) {
             cachedBoldFontSource = base;

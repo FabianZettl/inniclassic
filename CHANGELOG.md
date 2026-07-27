@@ -2,6 +2,32 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.2.0] - 2026-07-27
+
+A big visual consistency pass across every screen, plus two new features and a round of performance/battery work.
+
+### Added
+- **Video playback** — a new "Videos" entry in the Main Menu, its own folder on the SD card (`/storage/sdcard0/Videos`), and a full-screen player with wheel-driven volume/seek (long-press Center to switch between the two, short-press to play/pause). Built on the same ExoPlayer engine already used for audio, no new dependency. **This is a first implementation and still needs optimization** — large/high-bitrate files, thumbnails in the video list, and resume-position aren't addressed yet.
+- **Gapless playback** — automatically kicks in for albums and playlists of 15 tracks or fewer, as long as shuffle is off and no FLAC files are in the queue (FLAC uses a separate playback engine that can't join ExoPlayer's native queue, and large/shuffled queues intentionally keep the older, proven per-track loading path). Track transitions inside a gapless queue no longer stop and reload — ExoPlayer switches internally with no gap.
+- **Favorites are now visible at a glance** — Now Playing shows a hollow heart normally and a filled red heart when the current track is favorited, instead of showing nothing at all unless it happened to already be a favorite.
+
+### Changed
+- **Consistent look across every menu** — Main Menu, Music menu, Artists, Albums, Songs, and Settings/Bluetooth/Wi-Fi lists were all using slightly different font sizes, left margins, and row padding. Everything now shares the same left alignment (flush with the status bar title), the same row spacing, and one font-size scale.
+- **Right-arrow indicator** now only shows on the focused (blue) row everywhere, instead of being visible (just dimmer) on every row all the time.
+- **Album rows** got a larger cover thumbnail and slightly taller rows for better legibility, at the cost of one or two fewer rows fitting on screen.
+- **Status bar** redesigned to match the real iPod's proportions (thinner, smaller icons) and now consistently narrows to the left column on both the Main Menu and Music menu, letting the album cover on the right bleed all the way to the top behind it.
+- **Main Menu and Music menu covers are now visually identical**, including the slow panning ("Ken Burns") animation — previously only the Main Menu had it, the Music menu's cover was a static crop.
+- **Now Playing**: bigger album cover, "X of X" track counter in bold, more breathing room between the album name and track counter, and titles too long to fit now scroll (marquee) instead of just being cut off.
+- **Progress/volume bar** now has a subtle glass-like highlight through the middle instead of a flat fill.
+
+### Fixed
+- **Two real bugs found while reworking the Artist/Album row styling**: the focus arrow's color was tied to the theme instead of being fixed white like the rest of the app, and — more importantly — a recycled (scrolled-past-and-back) row could have its blue focused background incorrectly reset to the normal background on every re-render regardless of whether it was actually focused.
+- **Now Playing's progress ticker kept doing full work every 0.5 seconds even when Now Playing wasn't the visible screen** (e.g. browsing the library while music played in the background) — updating position, remaining time, and lyric auto-scroll on views nobody could see. Now skipped entirely unless Now Playing is actually on screen.
+- **The clock/widget refresh loop ran every second forever, including during "screen off" playback** (the screen-off state is a virtual black overlay, not a real display power-off, so the app keeps running underneath) — rebuilding a date formatter and refreshing Main Menu widgets every second regardless. Now drops to one no-op tick every 15 seconds while the screen is virtually off, and skips widget work entirely outside the Main Menu.
+
+### Optional: reduce background bloat
+A number of stock Android/MediaTek system apps that a dedicated music player never uses (Exchange mail sync, the phone/telephony stack, SIM toolkit, text-to-speech, live-wallpaper demos, calendar, an OEM RAM-cleaner utility, and others) can be safely disabled to free up RAM and stop unnecessary background activity. Two of them — the stock FM Radio app and the Download Manager provider — are **not** safe to remove, since InniClassic's own Radio and PC Upload features depend on them under the hood. This isn't baked into the ROM yet; ask if you want the exact list of packages.
+
 ## [1.1.2] - 2026-07-27
 
 Another batch of Reddit-reported bugs, this time from multiple users.
