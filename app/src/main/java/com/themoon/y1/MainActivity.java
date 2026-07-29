@@ -127,6 +127,16 @@ public class MainActivity extends Activity {
     // 🚀 [신규 추가] Music Quiz 게임 상태 변수들
     private List<SongItem> quizPool = new ArrayList<>();
     private SongItem quizCorrectAnswer;
+    // 🚀 [문제 유형 다양화] 제목만 묻던 것에서 아티스트/앨범/연도/장르까지 - 라이브러리 메타데이터가
+    // 허락하는 만큼 매 문제마다 무작위로 유형을 고릅니다.
+    private static final int QUIZ_TYPE_TITLE = 0;
+    private static final int QUIZ_TYPE_ARTIST = 1;
+    private static final int QUIZ_TYPE_ALBUM = 2;
+    private static final int QUIZ_TYPE_YEAR = 3;
+    private static final int QUIZ_TYPE_GENRE = 4;
+    private static final int QUIZ_TYPE_ALBUM_COVER = 5; // 🚀 [신규] 텍스트 대신 앨범 커버 3장 중에서 고르는 시각형 문제
+    private int currentQuizType = QUIZ_TYPE_TITLE;
+    private String quizCorrectAnswerText; // 현재 문제 유형 기준 "정답 문자열"
     private int quizScore = 0;
     // 🚀 [Music Quiz 2 라운드 구조] 5개 라운드 x 8문제. 한 라운드를 다 풀면(=8문제 답변) 다음 라운드로 진행합니다.
     // (목숨 3개는 게임 전체 공용 - 다 떨어지면 라운드 도중이라도 바로 게임 오버, 기존과 동일)
@@ -393,7 +403,9 @@ public class MainActivity extends Activity {
     // 🚀 [iPod 스타일] Backlight Timer - 일정 시간 조작이 없으면 자동으로 화면을 끕니다 (0 = Always On)
     private static final long[] BACKLIGHT_TIMER_OPTIONS_MS = {10000, 20000, 30000, 60000, 120000, 0};
     private static final String[] BACKLIGHT_TIMER_LABELS = {"10 Seconds", "20 Seconds", "30 Seconds", "1 Minute", "2 Minutes", "Always On"};
-    private int backlightTimerIndex = 0;
+    // 🚀 [기본값 완화] 10초는 신규 사용자에게 너무 공격적이어서 "설정 화면 넘기다가도 꺼진다"는
+    // 신고가 반복됐습니다 - "1분"을 기본값으로, 원하면 여전히 10초까지 줄일 수 있습니다.
+    private int backlightTimerIndex = 3;
     private final Handler backlightHandler = new Handler();
     private final Runnable backlightTimeoutRunnable = new Runnable() {
         @Override
@@ -459,7 +471,6 @@ public class MainActivity extends Activity {
     // 🚀 [신규 추가] Music Quiz 게임 화면 전용 뷰들
     private LinearLayout containerQuizItems;
     private TextView tvQuizScore, tvQuizLives, tvQuizPrompt, tvQuizRound;
-    private ImageView ivQuizCover;
     private ProgressBar pbQuizTimer;
     private LinearLayout containerBtItems, containerWifiItems;
 
@@ -673,7 +684,12 @@ public class MainActivity extends Activity {
             boolean isWifiActive = wm.isWifiEnabled() || wm.getWifiState() == WifiManager.WIFI_STATE_ENABLING;
             if (isWifiActive) {
                 wasWifiOnBeforeSleep = true;
-                if (!isServerRunning) {
+                // 🚀 [라디오 재생 중 하드웨어 방어막] FM 튜너가 켜져 있는 동안 Wi-Fi 전원을 껐다 켜면
+                // (많은 저가형 MTK 콤보 칩에서 FM/Wi-Fi/BT가 같은 RF 프론트엔드를 공유합니다) 튜너가
+                // 응답 없는 상태로 굳어버려 하드웨어 리셋 없이는 복구가 안 되는 사례가 보고되었습니다.
+                // 서버 실행 중일 때 이미 건드리지 않는 것과 같은 이유로, 라디오가 켜져 있을 때도 그대로 둡니다.
+                boolean isRadioActive = com.themoon.y1.managers.FmRadioManager.getInstance(this).isPowerUp;
+                if (!isServerRunning && !isRadioActive) {
                     wm.setWifiEnabled(false);
                 }
             } else {
@@ -740,6 +756,26 @@ public class MainActivity extends Activity {
                 Runtime.getRuntime().exec(new String[] { "su", "-c", "input keyevent 26" });
             } catch (Exception e) {
             }
+        }
+    }
+
+    // 🚀 [버그 수리] isFakeScreenOff는 그동안 true로만 켜지고 다시 false로 되돌리는 코드가 어디에도
+    // 없었습니다 - 라디오/웹서버 재생 중 백라이트 타이머가 한 번이라도 발동하면, 그 뒤로는 아무 버튼을
+    // 눌러도(진동/클릭음은 정상 작동하니 dispatchKeyEvent 자체는 계속 실행되고 있었음) 화면이 영원히
+    // 새까맣게 남아있었던 것이 이 함수 하나가 빠져서였습니다. 실제 화면을 껐다 켜는 turnOffScreen()의
+    // else 분기와 대칭을 이루도록, 오버레이/밝기/와이파이를 전부 원상복구합니다.
+    private void wakeFromFakeScreenOff() {
+        isFakeScreenOff = false;
+        autoManageWifiPower(false);
+        if (layoutLoadingOverlay != null) {
+            layoutLoadingOverlay.setVisibility(View.GONE);
+            layoutLoadingOverlay.setBackgroundColor(0xDD000000);
+        }
+        try {
+            WindowManager.LayoutParams lp = getWindow().getAttributes();
+            lp.screenBrightness = currentSystemBrightness / 255.0f;
+            getWindow().setAttributes(lp);
+        } catch (Exception e) {
         }
     }
 
@@ -1540,8 +1576,14 @@ public class MainActivity extends Activity {
             String cmd3 = "pm grant " + pkg + " android.permission.BLUETOOTH_PRIVILEGED";
             String cmd4 = "pm grant " + pkg + " android.permission.WRITE_SECURE_SETTINGS";
 
+            // 🚀 [AVRCP 절대 볼륨 끄기] AirPods 등 일부 헤드셋은 페어링 시 AVRCP "절대 볼륨"을 협상해서
+            // 우리 쪽 STREAM_MUSIC 슬라이더가 곧 헤드셋 볼륨이 되는데, 이 협상값이 낮게 고정되어 최대로
+            // 올려도 소리가 작다는 신고가 있었습니다. 이 MTK 계열 빌드에서 통하는 알려진 우회책으로
+            // 절대 볼륨 자체를 꺼서 헤드셋이 자기 물리 볼륨을 그대로 쓰게 만듭니다.
+            String cmd5 = "setprop persist.bluetooth.disableabsvol true";
+
             // 명령어들을 &&(AND)로 묶어 연달아 실행하고 시스템을 동기화(sync)합니다.
-            String combinedCmd = cmd1 + " && " + cmd2 + " && " + cmd3 + " && " + cmd4 + " && sync";
+            String combinedCmd = cmd1 + " && " + cmd2 + " && " + cmd3 + " && " + cmd4 + " && " + cmd5 + " && sync";
 
             Process proc = Runtime.getRuntime().exec(new String[] { "su", "-c", combinedCmd });
             proc.waitFor(); // 명령어 적용이 끝날 때까지 잠시 대기
@@ -1615,7 +1657,7 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
         }
         try {
-            backlightTimerIndex = prefs.getInt("backlight_timer_index", 0);
+            backlightTimerIndex = prefs.getInt("backlight_timer_index", 3);
             resetBacklightTimer();
         } catch (Exception e) {
         }
@@ -1778,7 +1820,6 @@ public class MainActivity extends Activity {
         tvQuizPrompt = findViewById(R.id.tv_quiz_prompt);
         tvQuizRound = findViewById(R.id.tv_quiz_round);
         pbQuizTimer = findViewById(R.id.pb_quiz_timer);
-        ivQuizCover = findViewById(R.id.iv_quiz_cover);
         layoutBluetoothMode = findViewById(R.id.layout_bluetooth_mode);
         containerBtItems = findViewById(R.id.container_bt_items);
         btnScanBt = findViewById(R.id.btn_scan_bt);
@@ -4094,16 +4135,16 @@ public class MainActivity extends Activity {
         row.setClickable(true);
         row.setSoundEffectsEnabled(false);
         row.setBackgroundResource(R.drawable.quiz_answer_pill_normal);
-        int padH = (int) (18 * d);
-        int padV = (int) (12 * d);
+        int padH = (int) (16 * d);
+        int padV = (int) (8 * d);
         row.setPadding(padH, padV, padH, padV);
         LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        rowLp.setMargins(0, (int) (5 * d), 0, (int) (5 * d));
+        rowLp.setMargins(0, (int) (3 * d), 0, (int) (3 * d));
         row.setLayoutParams(rowLp);
 
         final View dot = new View(this);
-        int dotSize = (int) (16 * d);
+        int dotSize = (int) (14 * d);
         LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dotSize, dotSize);
         dotLp.rightMargin = (int) (12 * d);
         dot.setLayoutParams(dotLp);
@@ -4143,10 +4184,54 @@ public class MainActivity extends Activity {
         return row;
     }
 
-    private void updateQuizCoverArt(final File file) {
-        if (ivQuizCover == null)
-            return;
-        ivQuizCover.setImageResource(R.drawable.default_album);
+    // 🚀 [시각형 문제 전용] 텍스트 알약 대신, 정사각형 앨범 커버 타일 - 포커스 시 파란 테두리로 강조됩니다.
+    private LinearLayout createQuizCoverOptionTile(File songFile) {
+        float d = getResources().getDisplayMetrics().density;
+        final LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER);
+        tile.setFocusable(true);
+        tile.setClickable(true);
+        tile.setSoundEffectsEnabled(false);
+        tile.setBackgroundResource(R.drawable.quiz_answer_pill_normal);
+        int pad = (int) (6 * d);
+        tile.setPadding(pad, pad, pad, pad);
+
+        LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f);
+        tileLp.setMargins((int) (4 * d), 0, (int) (4 * d), 0);
+        tile.setLayoutParams(tileLp);
+
+        final ImageView ivCover = new ImageView(this);
+        ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        ivCover.setImageResource(R.drawable.default_album);
+        LinearLayout.LayoutParams coverLp = new LinearLayout.LayoutParams(0, 0, 1.0f);
+        ivCover.setLayoutParams(coverLp);
+        tile.addView(ivCover);
+
+        extractQuizCoverArt(songFile, new QuizCoverCallback() {
+            @Override
+            public void onCoverLoaded(Bitmap bmp) {
+                if (bmp != null) ivCover.setImageBitmap(bmp);
+            }
+        });
+
+        tile.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                tile.setBackgroundResource(hasFocus ? R.drawable.quiz_answer_pill_focused : R.drawable.quiz_answer_pill_normal);
+            }
+        });
+        return tile;
+    }
+
+    private interface QuizCoverCallback {
+        void onCoverLoaded(Bitmap bmp);
+    }
+
+    // 🚀 [재사용] 원래는 문제 카드의 커버 미리보기 전용이었지만, 이제 커버 선택형 문제(4번 유형)의
+    // 보기 타일들을 채우는 데도 그대로 재사용합니다.
+    private void extractQuizCoverArt(final File file, final QuizCoverCallback callback) {
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -4177,13 +4262,52 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (ivQuizCover != null && finalArt != null && currentScreenState == STATE_MUSIC_QUIZ) {
-                            ivQuizCover.setImageBitmap(finalArt);
-                        }
+                        if (currentScreenState == STATE_MUSIC_QUIZ)
+                            callback.onCoverLoaded(finalArt);
                     }
                 });
             }
         }).start();
+    }
+
+    // 🚀 [문제 유형별 필드 추출] 이 유형의 질문에서 정답/보기로 쓸 문자열을 곡에서 뽑아옵니다.
+    private String getQuizFieldValue(SongItem s, int type) {
+        switch (type) {
+            case QUIZ_TYPE_ARTIST: return s.artist;
+            case QUIZ_TYPE_ALBUM: case QUIZ_TYPE_ALBUM_COVER: return s.album;
+            case QUIZ_TYPE_YEAR: return s.year;
+            case QUIZ_TYPE_GENRE: return s.genre;
+            default: return s.title;
+        }
+    }
+
+    // 🚀 [유효성 검사] "Unknown Artist" 같은 빈 태그는 문제/보기로 쓰기에 부적절하므로 걸러냅니다.
+    private boolean isValidQuizField(SongItem s, int type) {
+        if (type == QUIZ_TYPE_TITLE) return true; // quizPool 자체가 이미 제목 유효성을 보장합니다.
+        String v = getQuizFieldValue(s, type);
+        return v != null && !v.trim().isEmpty() && !v.trim().toLowerCase(Locale.US).startsWith("unknown");
+    }
+
+    // 🚀 이 유형으로 문제를 낼 만큼(4지선다에 충분할 만큼) 서로 다른 값이 라이브러리에 있는지 확인합니다.
+    private int countDistinctQuizField(int type) {
+        java.util.HashSet<String> distinct = new java.util.HashSet<>();
+        for (SongItem s : quizPool) {
+            if (isValidQuizField(s, type))
+                distinct.add(getQuizFieldValue(s, type).trim().toLowerCase(Locale.US));
+        }
+        return distinct.size();
+    }
+
+    private String getQuizPromptText(int type, SongItem song) {
+        String title = "“" + song.title + "”";
+        switch (type) {
+            case QUIZ_TYPE_ARTIST: return t("Which artist released") + " " + title + "?";
+            case QUIZ_TYPE_ALBUM: return t("Which album is") + " " + title + " " + t("from?");
+            case QUIZ_TYPE_YEAR: return t("What year was") + " " + title + " " + t("released?");
+            case QUIZ_TYPE_GENRE: return t("What genre is") + " " + title + "?";
+            case QUIZ_TYPE_ALBUM_COVER: return t("Which cover matches this song's album?");
+            default: return t("What song is playing?");
+        }
     }
 
     private void loadNextQuizQuestion() {
@@ -4201,48 +4325,112 @@ public class MainActivity extends Activity {
         quizAnswered = false;
         quizQuestionInRound++;
         updateQuizScoreLivesUI();
-        if (tvQuizPrompt != null)
-            tvQuizPrompt.setText(t("What song is playing?"));
 
         final java.util.Random rnd = new java.util.Random();
-        quizCorrectAnswer = quizPool.get(rnd.nextInt(quizPool.size()));
 
-        // 🚀 [원작 재현] 진짜 iPod Music Quiz처럼 5지선다!
-        final int QUIZ_OPTION_COUNT = 5;
-        java.util.LinkedHashSet<SongItem> options = new java.util.LinkedHashSet<>();
-        options.add(quizCorrectAnswer);
-        int guard = 0;
-        while (options.size() < QUIZ_OPTION_COUNT && guard < 200) {
-            guard++;
-            SongItem candidate = quizPool.get(rnd.nextInt(quizPool.size()));
-            boolean dup = false;
-            for (SongItem existing : options) {
-                if (candidate.title.equalsIgnoreCase(existing.title)) { dup = true; break; }
-            }
-            if (!dup)
-                options.add(candidate);
-        }
-        final List<SongItem> optionList = new ArrayList<>(options);
-        // 라이브러리가 아주 작아서 서로 다른 제목을 다 못 채웠다면, 남는 자리는 그냥 아무거나로 채웁니다 (극단적 예외 상황 대비).
-        while (optionList.size() < QUIZ_OPTION_COUNT && !quizPool.isEmpty()) {
-            optionList.add(quizPool.get(rnd.nextInt(quizPool.size())));
-        }
-        java.util.Collections.shuffle(optionList);
+        // 🚀 [문제 유형 랜덤 선택] 라이브러리에 4지선다를 채울 만큼 서로 다른 값이 있는 유형만 후보로 남깁니다.
+        // 제목(TITLE)은 quizPool 자체가 이미 보장하므로 항상 가능합니다.
+        List<Integer> availableTypes = new ArrayList<>();
+        availableTypes.add(QUIZ_TYPE_TITLE);
+        if (countDistinctQuizField(QUIZ_TYPE_ARTIST) >= 4) availableTypes.add(QUIZ_TYPE_ARTIST);
+        if (countDistinctQuizField(QUIZ_TYPE_ALBUM) >= 4) availableTypes.add(QUIZ_TYPE_ALBUM);
+        if (countDistinctQuizField(QUIZ_TYPE_YEAR) >= 4) availableTypes.add(QUIZ_TYPE_YEAR);
+        if (countDistinctQuizField(QUIZ_TYPE_GENRE) >= 4) availableTypes.add(QUIZ_TYPE_GENRE);
+        // 🚀 커버 선택형은 사진 3장만 있으면 되므로 기준을 3으로 살짝 낮춥니다.
+        if (countDistinctQuizField(QUIZ_TYPE_ALBUM_COVER) >= 3) availableTypes.add(QUIZ_TYPE_ALBUM_COVER);
+        currentQuizType = availableTypes.get(rnd.nextInt(availableTypes.size()));
 
-        // 🚀 [원작 재현] 앨범 커버를 매 라운드 새 곡에 맞춰 갱신!
-        updateQuizCoverArt(quizCorrectAnswer.file);
+        // 이 유형에서 유효한 값을 가진 곡들만 후보 풀로 씁니다 (예: 연도 문제는 연도 태그가 있는 곡만).
+        List<SongItem> typePool = new ArrayList<>();
+        for (SongItem s : quizPool) {
+            if (isValidQuizField(s, currentQuizType)) typePool.add(s);
+        }
+        if (typePool.isEmpty()) typePool = quizPool; // 안전망
+
+        quizCorrectAnswer = typePool.get(rnd.nextInt(typePool.size()));
+        quizCorrectAnswerText = getQuizFieldValue(quizCorrectAnswer, currentQuizType);
+
+        if (tvQuizPrompt != null)
+            tvQuizPrompt.setText(getQuizPromptText(currentQuizType, quizCorrectAnswer));
 
         containerQuizItems.removeAllViews();
-        for (final SongItem option : optionList) {
-            LinearLayout row = createQuizAnswerPill(option.title);
-            row.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    clickFeedback();
-                    onQuizAnswerSelected(option);
+
+        if (currentQuizType == QUIZ_TYPE_ALBUM_COVER) {
+            // 🚀 [시각형 문제] 서로 다른 앨범 3장의 커버를 나란히 보여주고 고르게 합니다.
+            containerQuizItems.setOrientation(LinearLayout.HORIZONTAL);
+
+            java.util.LinkedHashMap<String, SongItem> albumReps = new java.util.LinkedHashMap<>();
+            for (SongItem s : typePool) {
+                String key = s.album.trim().toLowerCase(Locale.US);
+                if (!albumReps.containsKey(key)) albumReps.put(key, s);
+            }
+            // 정답 곡의 앨범은 반드시 대표로 뽑히도록 강제 등록!
+            albumReps.put(quizCorrectAnswer.album.trim().toLowerCase(Locale.US), quizCorrectAnswer);
+
+            List<SongItem> repList = new ArrayList<>(albumReps.values());
+            java.util.Collections.shuffle(repList);
+
+            final int COVER_OPTION_COUNT = 3;
+            List<SongItem> coverOptions = new ArrayList<>();
+            coverOptions.add(quizCorrectAnswer);
+            for (SongItem rep : repList) {
+                if (coverOptions.size() >= COVER_OPTION_COUNT) break;
+                boolean sameAlbum = false;
+                for (SongItem existing : coverOptions) {
+                    if (rep.album.equalsIgnoreCase(existing.album)) { sameAlbum = true; break; }
                 }
-            });
-            containerQuizItems.addView(row);
+                if (!sameAlbum) coverOptions.add(rep);
+            }
+            java.util.Collections.shuffle(coverOptions);
+
+            for (final SongItem coverSong : coverOptions) {
+                LinearLayout tile = createQuizCoverOptionTile(coverSong.file);
+                tile.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        onQuizAnswerSelected(coverSong.album);
+                    }
+                });
+                containerQuizItems.addView(tile);
+            }
+        } else {
+            containerQuizItems.setOrientation(LinearLayout.VERTICAL);
+
+            // 🚀 [실제 iPod 스타일] 4지선다 - 화면에 스크롤 없이 다 보이도록 5개에서 4개로 조정!
+            final int QUIZ_OPTION_COUNT = 4;
+            java.util.LinkedHashSet<String> options = new java.util.LinkedHashSet<>();
+            options.add(quizCorrectAnswerText);
+            int guard = 0;
+            while (options.size() < QUIZ_OPTION_COUNT && guard < 200) {
+                guard++;
+                SongItem candidate = typePool.get(rnd.nextInt(typePool.size()));
+                String candidateText = getQuizFieldValue(candidate, currentQuizType);
+                boolean dup = false;
+                for (String existing : options) {
+                    if (candidateText.equalsIgnoreCase(existing)) { dup = true; break; }
+                }
+                if (!dup)
+                    options.add(candidateText);
+            }
+            final List<String> optionList = new ArrayList<>(options);
+            // 라이브러리가 아주 작아서 서로 다른 값을 다 못 채웠다면, 남는 자리는 그냥 아무거나로 채웁니다 (극단적 예외 상황 대비).
+            while (optionList.size() < QUIZ_OPTION_COUNT && !typePool.isEmpty()) {
+                optionList.add(getQuizFieldValue(typePool.get(rnd.nextInt(typePool.size())), currentQuizType));
+            }
+            java.util.Collections.shuffle(optionList);
+
+            for (final String optionText : optionList) {
+                LinearLayout row = createQuizAnswerPill(optionText);
+                row.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        onQuizAnswerSelected(optionText);
+                    }
+                });
+                containerQuizItems.addView(row);
+            }
         }
         containerQuizItems.postDelayed(new Runnable() {
             @Override
@@ -4341,15 +4529,15 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void onQuizAnswerSelected(SongItem selected) {
+    private void onQuizAnswerSelected(String selected) {
         if (quizAnswered)
             return;
         quizAnswered = true;
         cancelQuizTimer();
         stopQuizPreviewPlayback();
 
-        boolean correct = selected != null && quizCorrectAnswer != null
-                && selected.title.equalsIgnoreCase(quizCorrectAnswer.title);
+        boolean correct = selected != null && quizCorrectAnswerText != null
+                && selected.equalsIgnoreCase(quizCorrectAnswerText);
 
         if (correct) {
             quizScore++;
@@ -4357,7 +4545,7 @@ public class MainActivity extends Activity {
         } else {
             quizLives--;
             Toast.makeText(this,
-                    "❌ " + t("It was: ") + (quizCorrectAnswer != null ? quizCorrectAnswer.title : ""),
+                    "❌ " + t("It was: ") + (quizCorrectAnswerText != null ? quizCorrectAnswerText : ""),
                     Toast.LENGTH_SHORT).show();
         }
         updateQuizScoreLivesUI();
@@ -4387,6 +4575,7 @@ public class MainActivity extends Activity {
         }
         updateQuizScoreLivesUI();
 
+        containerQuizItems.setOrientation(LinearLayout.VERTICAL); // 🚀 직전 문제가 커버 선택형이었을 수도 있으니 방향 복구
         containerQuizItems.removeAllViews();
         LinearLayout btnContinue = createQuizAnswerPill(t("Continue"));
         btnContinue.setOnClickListener(new View.OnClickListener() {
@@ -4427,6 +4616,7 @@ public class MainActivity extends Activity {
             pbQuizTimer.setProgress(0);
         updateQuizScoreLivesUI();
 
+        containerQuizItems.setOrientation(LinearLayout.VERTICAL); // 🚀 직전 문제가 커버 선택형이었을 수도 있으니 방향 복구
         containerQuizItems.removeAllViews();
         LinearLayout btnAgain = createQuizAnswerPill(t("Play Again"));
         btnAgain.setOnClickListener(new View.OnClickListener() {
@@ -4474,6 +4664,7 @@ public class MainActivity extends Activity {
             pbQuizTimer.setProgress(0);
         updateQuizScoreLivesUI();
 
+        containerQuizItems.setOrientation(LinearLayout.VERTICAL); // 🚀 직전 문제가 커버 선택형이었을 수도 있으니 방향 복구
         containerQuizItems.removeAllViews();
         LinearLayout btnAgain = createQuizAnswerPill(t("Play Again"));
         btnAgain.setOnClickListener(new View.OnClickListener() {
@@ -12157,6 +12348,16 @@ public class MainActivity extends Activity {
         // 바로 리셋해서 진짜 "조작 중엔 안 꺼짐"이 되도록 합니다.
         resetBacklightTimer();
 
+        // 🚀 [가상 암전 깨우기] 라디오/웹서버 재생 중이라 진짜 화면 전원은 안 끄고 검은 오버레이+밝기
+        // 0.01로만 "가짜로" 꺼둔 상태(isFakeScreenOff)일 때는, 실제 화면 인터랙티브 상태(pm.isInteractive())가
+        // 전혀 바뀌지 않으므로 아래 isWakingUp 판정에 걸리지 않습니다 - 첫 키 입력에서 직접 깨워줍니다.
+        if (isFakeScreenOff) {
+            if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                wakeFromFakeScreenOff();
+            }
+            return true;
+        }
+
         // =======================================================
         // 🔒 [화면 잠금 방어막] 화면이 꺼져있을 때는 휠/버튼이 그대로 통과되어 볼륨 조절/탐색 등이
         // 몰래 작동하지 않도록 여기서 전부 막습니다. (이 체크가 예전에는 절대 실행되지 않는
@@ -12177,6 +12378,18 @@ public class MainActivity extends Activity {
                 || (System.currentTimeMillis() - lastScreenOnTime < 500);
 
         if (isWakingUp) {
+            // 🚀 [진짜 화면 깨우기] turnOffScreen()이 진짜로 화면을 끌 때는 "su -c input keyevent 26"으로
+            // 전원 버튼을 흉내 냈는데, 정작 그걸 다시 켜주는 코드가 어디에도 없었습니다 - 이 기기에서는
+            // 휠/버튼이 Android의 "wake key"로 등록되어 있지 않아 화면이 꺼진 채로 입력만 앱까지 전달되고
+            // (그래서 진동/클릭음은 정상 작동), 화면 자체는 영원히 꺼진 채로 남아있었던 것이 원인입니다.
+            if (!isScreenOnForLock && action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                try {
+                    Runtime.getRuntime().exec(new String[] { "su", "-c", "input keyevent 26" });
+                } catch (Exception e) {
+                }
+                lastScreenOnTime = System.currentTimeMillis();
+            }
+
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                 if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                     event.startTracking();
@@ -12973,7 +13186,7 @@ public class MainActivity extends Activity {
         volumeLimitMax = -1;
         isSoundCheckEnabled = false;
         isAlbumTiltEnabled = true;
-        backlightTimerIndex = 0;
+        backlightTimerIndex = 3;
         isScreenOffControlEnabled = false;
         repeatMode = 0;
         isLoopScrollOn = true;

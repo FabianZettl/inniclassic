@@ -39,6 +39,10 @@ public class AudioPlayerManager {
     public Y1CrossfeedAudioProcessor crossfeedProcessor = new Y1CrossfeedAudioProcessor();
     public MediaPlayer legacyPlayer;
     public boolean isUsingLegacyPlayer = false;
+    // 🚀 [FLAC 2단 엔진] 네이티브 legacyPlayer가 재생 도중 특정 FLAC 파일에서 에러를 뱉으면(일부
+    // 리포트: "Legacy Player Error: 262" - 이 기기의 순정 FLAC 추출기가 못 읽는 파일), 곧바로 포기하지
+    // 않고 그 파일의 경로만 여기에 기록해서 딱 한 번 ExoPlayer의 FLAC 익스텐션으로 재시도합니다.
+    private final java.util.Set<String> flacLegacyFailedPaths = new java.util.HashSet<>();
     // 🚀 [Gapless 재생] 앨범(또는 15곡 이하 재생목록)일 때만 켜집니다 - ExoPlayer의 네이티브 큐 기능을 써서
     // 트랙 사이에 정지/재장전 없이 이어지도록 합니다. FLAC은 별도의 legacyPlayer 엔진을 쓰기 때문에
     // 이 큐에 섞일 수 없어 자동으로 제외됩니다.
@@ -621,7 +625,9 @@ public class AudioPlayerManager {
         // 🚀 [FLAC 재생 버그 수정] 아래 "FLAC: 데드락 구출용 특수 엔진" 분기가 실제로는 한 번도 켜지지
         // 않고 있었습니다 - isUsingLegacyPlayer가 항상 false로 고정되어 있어서 FLAC도 그냥 ExoPlayer로
         // 흘러갔고, ExoPlayer의 FLAC 익스텐션이 일부 기기에서 멈춰버려(0:00에서 진행 안 됨) 있었습니다.
-        isUsingLegacyPlayer = isFlac;
+        // 다만 이 파일이 이미 한 번 네이티브 엔진에서 에러를 낸 적이 있다면(flacLegacyFailedPaths), 이번엔
+        // 처음부터 ExoPlayer의 FLAC 익스텐션으로 보냅니다.
+        isUsingLegacyPlayer = isFlac && !flacLegacyFailedPaths.contains(track.getAbsolutePath());
 
         try {
             String t = null;
@@ -848,14 +854,22 @@ public class AudioPlayerManager {
                     legacyPlayer = new MediaPlayer();
                     legacyPlayer.setWakeMode(main.getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
                     legacyPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
-                    legacyPlayer.setOnCompletionListener(mp -> handleTrackCompletion());
-                    legacyPlayer.setOnErrorListener((mp, what, extra) -> {
-                        handleTrackError("Legacy Player Error: " + what);
-                        return true;
-                    });
                 } else {
                     legacyPlayer.reset();
                 }
+                // 🚀 [매 트랙마다 재설정] 리스너를 최초 1회만 달면 클로저가 "그때 그 트랙"의 index/track을
+                // 영원히 붙들고 있어서, 재사용되는 legacyPlayer 인스턴스로 다음 곡을 틀었을 때 에러가 나면
+                // 엉뚱한(첫 곡의) index로 재시도하게 됩니다 - 매번 지금 로드 중인 트랙 값으로 새로 겁니다.
+                legacyPlayer.setOnCompletionListener(mp -> handleTrackCompletion());
+                legacyPlayer.setOnErrorListener((mp, what, extra) -> {
+                    if (isFlac && flacLegacyFailedPaths.add(track.getAbsolutePath())) {
+                        // 첫 실패: ExoPlayer의 FLAC 익스텐션으로 딱 한 번 재시도
+                        prepareMusicTrack(index);
+                    } else {
+                        handleTrackError("Legacy Player Error: " + what + " (extra " + extra + ")");
+                    }
+                    return true;
+                });
 
                 if (currentFileInputStream != null) {
                     try { currentFileInputStream.close(); } catch (Exception e) {}

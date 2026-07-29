@@ -2,6 +2,27 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.3.0] - 2026-07-29
+
+A Music Quiz overhaul, a Now Playing polish pass, and another batch of Reddit-reported bugs — mostly sleep/wake and audio.
+
+### Added
+- **Music Quiz: five new question types** — alongside "What song is playing?", it can now ask which artist released a track, which album it's from, what year it came out, and what genre it is (each only offered when your library actually has enough distinct values to make a fair question). Also new: a visual question type showing 3 album covers side by side to pick from instead of text answers.
+- **Music Quiz: all 4 answers now fit on screen at once**, no more scrolling to see the other options — the album cover was removed from the question card and chrome (badges, progress bar, score row) was shrunk to make room.
+
+### Changed
+- **Now Playing**: the album cover sits slightly lower, spacing between Title/Artist/Album is now perfectly consistent, the star rating moved between Album and the track counter, and the "X of Y" track counter is now bold at the same size as the rest of the info block.
+- Documented the existing (but easy-to-miss) **synced lyrics** support in the README: drop a `.lrc` file next to a song (same filename) or embed lyrics in ID3/FLAC/ALAC tags, then long-press Center on Now Playing → Toggle Visualizer to see them scroll in sync with playback.
+
+### Fixed
+- **Screen never came back on after the backlight timer put it to sleep** — two separate bugs, both now fixed:
+  - The "virtual" sleep used while FM Radio or the web server is running (so the CPU stays alive) set a flag to fake the screen off but never had any code path that turned it back off. Once it triggered, the screen stayed black forever (vibration/click feedback still worked, since the app itself never stopped running) until a full reboot.
+  - The "real" sleep used during ordinary music playback simulates a power-button press to turn the display off, but nothing ever simulated a second press to turn it back on. The wheel/buttons aren't registered as Android "wake keys" on this hardware, so nothing brought the display back short of the actual hardware power button.
+- **Full device lockup (required a paperclip reset) when playing FM Radio through wired headphones for a few minutes** — the backlight timer's "virtual sleep" path was also toggling Wi-Fi off, even while the FM tuner was actively running. On this chipset, FM/Wi-Fi/Bluetooth share the same combo radio hardware; killing Wi-Fi out from under a live FM session could wedge the shared chip badly enough to need a hard reset. Wi-Fi is now left alone whenever the radio is on, the same way it was already left alone whenever the web server is running.
+- **Screen dimming during active use** — the out-of-the-box Backlight Timer default was 10 seconds, which is aggressive enough to feel like the screen "won't stay on" during normal browsing/listening. Default is now 1 minute (still adjustable down to 10 seconds in Settings if you want it).
+- **Bluetooth headphones (reported with AirPods) noticeably quiet** — a known AVRCP "absolute volume" quirk where the phone-side volume slider becomes the headset's actual volume, and the negotiated level can end up low. Absolute volume is now disabled on connect, so headphones fall back to using their own physical volume control.
+- **Some FLAC files failed to play with "Legacy Player Error: 262"** — the native decoder used for FLAC (to avoid a separate ExoPlayer FLAC hang bug) rejects a handful of files that ExoPlayer's own FLAC extension can actually decode. Failing files now automatically retry once through ExoPlayer's FLAC extension instead of just giving up; the error message also now includes the decoder's `extra` code for easier triage if a file still fails both engines.
+
 ## [1.2.0] - 2026-07-27
 
 A big visual consistency pass across every screen, plus two new features and a round of performance/battery work.

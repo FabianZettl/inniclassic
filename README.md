@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/Device-Innioasis%20Y1%20only-blue?style=flat-square" alt="Device">
   <img src="https://img.shields.io/badge/Status-Beta-Orange?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/Version-1.2.0-informational?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.3.0-informational?style=flat-square" alt="Version">
 </p>
 
 **InniClassic** is a launcher for the **Innioasis Y1** built directly on top of and based on [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) — all credit for the original launcher, media engine, and theme system goes to that project. The goal of InniClassic is to turn JJ Launcher into as close to the original **iPod Classic experience** as possible, while going beyond it where it makes sense (FM Radio, Podcasts, Video, a from-scratch Music Quiz).
@@ -36,6 +36,7 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 - Redesigned **Now Playing** screen — large angled album cover with a reflection underneath (toggleable via **Album Cover Tilt**), a glass-look progress/volume bar, and a scrolling marquee for titles too long to fit
 - Center-click on Now Playing cycles **Progress → Seek → Shuffle & Repeat → Rating**, exactly like a real iPod Classic (the wheel scrubs, cycles shuffle/repeat, or sets a star rating depending on the state; volume control otherwise)
 - **On-The-Go playlist** and a **Now Playing hold-menu** (long-press Center): Add to On-The-Go, Rate Song, Browse Album, Browse Artist, Toggle Visualizer
+- **Synced lyrics** — "Toggle Visualizer" swaps the spectrum analyzer for a scrolling, time-synced lyrics view whenever lyrics are found for the current track: an external `.lrc` file next to the song (same filename), or embedded lyrics (ID3 `USLT` for MP3, FLAC/ALAC tags) — synced if they contain `[mm:ss.xx]` timestamps, otherwise shown as plain scrolling text
 - **Favorites** with a heart indicator on Now Playing (hollow when not favorited, filled red when it is)
 - Fast-scroll letter jump on every alphabetized list, like spinning a real click wheel
 - A from-scratch recreation of the classic **iPod Music Quiz** using your own library, 5 rounds of 8 questions with round-complete and victory screens
