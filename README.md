@@ -5,6 +5,7 @@
   <img src="https://img.shields.io/badge/Device-Innioasis%20Y1%20only-blue?style=flat-square" alt="Device">
   <img src="https://img.shields.io/badge/Status-Beta-Orange?style=flat-square" alt="Status">
   <img src="https://img.shields.io/badge/Version-1.3.0-informational?style=flat-square" alt="Version">
+  <a href="https://buymeacoffee.com/gz17egcara"><img src="https://img.shields.io/badge/Buy%20me%20a-coffee-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
 **InniClassic** is a launcher for the **Innioasis Y1** built directly on top of and based on [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) — all credit for the original launcher, media engine, and theme system goes to that project. The goal of InniClassic is to turn JJ Launcher into as close to the original **iPod Classic experience** as possible, while going beyond it where it makes sense (FM Radio, Podcasts, Video, a from-scratch Music Quiz).
@@ -159,5 +160,7 @@ For anyone tracking this project against [ismileblue/y1_launcher](https://github
 - Based on [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) — all credit for the original launcher, media engine, and theme system goes to the original author.
 - The bundled iPod Classic theme's system font is [Nimbus Sans](https://en.wikipedia.org/wiki/Nimbus_Sans) (URW++), a free, metric-compatible alternative to Helvetica.
 - Distributed under the same license as upstream — see [LICENSE](LICENSE) (free for personal/educational, non-commercial use).
+
+If InniClassic's useful to you, you can [buy me a coffee](https://buymeacoffee.com/gz17egcara) — totally optional, never required.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
