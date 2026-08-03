@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/Device-Innioasis%20Y1%20only-blue?style=flat-square" alt="Device">
   <img src="https://img.shields.io/badge/Status-Beta-Orange?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/Version-1.3.0-informational?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.3.1-informational?style=flat-square" alt="Version">
   <a href="https://buymeacoffee.com/gz17egcara"><img src="https://img.shields.io/badge/Buy%20me%20a-coffee-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
@@ -47,7 +47,8 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 - Wide format support: MP3, FLAC, WAV, OGG Vorbis, Opus (including `.ogg`-extension Opus files), ALAC/M4A, AAC
 - **Gapless playback** for albums and playlists of 15 tracks or fewer (see [Known limitations](#known-limitations))
 - **Shuffle** row pinned to the top of All Songs, matching stock Y1 firmware
-- Last.fm scrobbling — a local `.scrobbler.log` (Audioscrobbler 1.1 format) plus live scrobbling against the real Last.fm API, with a browser-based login flow since typing credentials with a click wheel is painful
+- **Cover art**: use at least **600×600**, ideally **1000×1000 or larger** — the Main Menu and Music menu covers pan slowly ("Ken Burns") across a panel that's rendered close to full screen height and then overscanned further for the pan itself, so anything smaller (e.g. 300×300) looks visibly soft/blurry once it's stretched and moving. Embedded cover art (ID3/FLAC/ALAC tags) and folder `cover.jpg`/`folder.jpg` are both supported.
+- **Last.fm scrobbling** — every track you play past the halfway point (or 4 minutes, whichever comes first) is automatically appended to a local `.scrobbler.log` at the root of your SD card (Audioscrobbler 1.1 format, same idea as Rockbox) — no setup, no account, works out of the box. To also send scrobbles to a real Last.fm account, turn on **Settings → Sync Scrobbles to Last.fm** and log in via **Settings → Last.fm Account** through a browser-based flow (the device shows a URL/QR you open on your phone or PC, since typing credentials with a click wheel is painful) — scrobbles queue locally and get sent once you're logged in and online. Note `.scrobbler.log` starts with a dot, so it won't show up in file managers/apps that hide hidden files by default.
 
 ### Beyond music
 - **Podcasts** — subscribe, stream, download for offline listening
@@ -107,7 +108,7 @@ Use this if you already have JJ Launcher running (via the stock firmware or Meth
    adb shell pm grant com.themoon.y1 android.permission.WRITE_SECURE_SETTINGS
    ```
 
-To enable Last.fm scrobbling, open **Settings → Last.fm** on the device and log in through the browser-based flow (the device shows a URL/QR you open on your phone or PC). To use a custom theme other than the bundled iPod Classic one, see JJ Launcher's original theme documentation.
+The local `.scrobbler.log` works automatically with no setup. To also sync scrobbles to a real Last.fm account, turn on **Settings → Sync Scrobbles to Last.fm** and log in via **Settings → Last.fm Account** through the browser-based flow (the device shows a URL/QR you open on your phone or PC). To use a custom theme other than the bundled iPod Classic one, see JJ Launcher's original theme documentation.
 
 ### Replacing the stock JJ Launcher app
 

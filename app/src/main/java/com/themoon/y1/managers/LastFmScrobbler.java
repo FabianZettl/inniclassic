@@ -194,7 +194,12 @@ public class LastFmScrobbler {
     // Call right before switching away from the current track (skip, auto-advance,
     // or natural completion) with its current playback position.
     public void evaluateAndMaybeSubmit(long currentPositionMs) {
-        if (curSubmitted || curFilePath == null || !isEnabled()) return;
+        // 🚀 [버그 수리] 예전엔 이 함수 전체가 !isEnabled()(=Settings의 "Scrobble to Last.fm" 토글)에 걸려
+        // 있어서, 로그인은 물론 그 토글을 직접 켠 적도 없는 사용자는 로컬 .scrobbler.log조차 절대 생성되지
+        // 않았습니다 - README에는 이게 계정 없이도 항상 남는 로컬 기록처럼 적혀 있는데 실제로는 그렇지
+        // 않았던 것. 로컬 로그(계정/네트워크 불필요, SD카드 안에만 남는 순수 텍스트)는 이제 항상 남기고,
+        // 실제 Last.fm API로 보내는 부분만 그 토글로 계속 제어합니다.
+        if (curSubmitted || curFilePath == null) return;
         long durationSec = curDurationMs / 1000;
         if (durationSec < MIN_TRACK_LENGTH_SEC) {
             curSubmitted = true;
@@ -208,13 +213,16 @@ public class LastFmScrobbler {
 
         curSubmitted = true;
         appendToScrobblerLog(curArtist, curAlbum, curTitle, durationSec, curStartedAtUnixSec);
-        enqueuePendingScrobble(curArtist, curAlbum, curTitle, durationSec, curStartedAtUnixSec);
-        worker.execute(new Runnable() {
-            @Override
-            public void run() {
-                flushPendingQueue();
-            }
-        });
+
+        if (isEnabled()) {
+            enqueuePendingScrobble(curArtist, curAlbum, curTitle, durationSec, curStartedAtUnixSec);
+            worker.execute(new Runnable() {
+                @Override
+                public void run() {
+                    flushPendingQueue();
+                }
+            });
+        }
     }
 
     private boolean isExcludedPath(String path) {

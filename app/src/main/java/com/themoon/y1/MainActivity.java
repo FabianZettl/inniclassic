@@ -3081,10 +3081,7 @@ public class MainActivity extends Activity {
                         isFetchingRandomCover = false;
                         if (finalArt != null) {
                             try {
-                                BitmapFactory.Options opts = new BitmapFactory.Options();
-                                opts.inSampleSize = 2;
-                                idleRandomCoverBitmap = BitmapFactory.decodeByteArray(finalArt, 0, finalArt.length,
-                                        opts);
+                                idleRandomCoverBitmap = decodeAlbumArtSmart(finalArt);
                                 if (ivAnimatedCover != null && lastAlbumArtBytes == null) {
                                     ivAnimatedCover.setImageBitmap(idleRandomCoverBitmap);
                                 }
@@ -3096,6 +3093,21 @@ public class MainActivity extends Activity {
             }
         }).start();
     }
+    // 🚀 [커버 화질 버그 수리] 메인/뮤직 메뉴의 드리프트 커버 위젯은 지금까지 항상 inSampleSize=2로
+    // 강제 절반 축소해서 디코딩했습니다 - 원본이 1000px대의 큰 임베디드 아트라면 문제없지만, 사용자가
+    // 300x300처럼 이미 작은 커버를 넣으면 거기서 또 절반(150x150)으로 줄인 뒤 화면 거의 전체 크기로
+    // 늘려 그리다 보니 팬 애니메이션 중에 심하게 뭉개져 보였습니다("완전히 압축된 것처럼"). 이제 실제
+    // 원본 크기를 먼저 확인해서, 이미 작은 이미지는 그대로 디코딩하고 큰 이미지만 절반으로 줄입니다.
+    private Bitmap decodeAlbumArtSmart(byte[] data) {
+        BitmapFactory.Options boundsOpts = new BitmapFactory.Options();
+        boundsOpts.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(data, 0, data.length, boundsOpts);
+
+        BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inSampleSize = (Math.max(boundsOpts.outWidth, boundsOpts.outHeight) > 600) ? 2 : 1;
+        return BitmapFactory.decodeByteArray(data, 0, data.length, opts);
+    }
+
     // 💡 [개조 완료] 다운로드 진행률(%)과 용량(MB)을 실시간 팝업으로 보여주는 엔진!
     // 위쪽에 있는 이 주석 바로 위에 있는 refreshWidgets() 함수를 통째로 덮어쓰세요!
 
@@ -3170,11 +3182,7 @@ public class MainActivity extends Activity {
 
                 if (lastAlbumArtBytes != null) {
                     try {
-                        BitmapFactory.Options opts = new BitmapFactory.Options();
-                        opts.inSampleSize = 2;
-                        Bitmap bmp = BitmapFactory.decodeByteArray(lastAlbumArtBytes,
-                                0, lastAlbumArtBytes.length, opts);
-                        ivWidgetAlbum.setImageBitmap(bmp);
+                        ivWidgetAlbum.setImageBitmap(decodeAlbumArtSmart(lastAlbumArtBytes));
                     } catch (Exception e) {
                     }
                 } else {
@@ -3188,10 +3196,7 @@ public class MainActivity extends Activity {
         if (ivAnimatedCover != null) {
             if (lastAlbumArtBytes != null && lastAlbumArtBytes.length > 0) {
                 try {
-                    BitmapFactory.Options opts = new BitmapFactory.Options();
-                    opts.inSampleSize = 2;
-                    Bitmap bmp = BitmapFactory.decodeByteArray(lastAlbumArtBytes, 0, lastAlbumArtBytes.length, opts);
-                    ivAnimatedCover.setImageBitmap(bmp);
+                    ivAnimatedCover.setImageBitmap(decodeAlbumArtSmart(lastAlbumArtBytes));
                 } catch (Exception e) {
                 }
             } else if (idleRandomCoverBitmap != null) {
@@ -3206,10 +3211,7 @@ public class MainActivity extends Activity {
         if (ivBrowserCover != null && frameBrowserCover != null && frameBrowserCover.getVisibility() == View.VISIBLE) {
             if (lastAlbumArtBytes != null && lastAlbumArtBytes.length > 0) {
                 try {
-                    BitmapFactory.Options opts = new BitmapFactory.Options();
-                    opts.inSampleSize = 2;
-                    Bitmap bmp = BitmapFactory.decodeByteArray(lastAlbumArtBytes, 0, lastAlbumArtBytes.length, opts);
-                    ivBrowserCover.setImageBitmap(bmp);
+                    ivBrowserCover.setImageBitmap(decodeAlbumArtSmart(lastAlbumArtBytes));
                 } catch (Exception e) {
                 }
             } else if (idleRandomCoverBitmap != null) {
@@ -6200,7 +6202,7 @@ public class MainActivity extends Activity {
 
         // 🚀 [신규 추가] Last.fm 스크로블링 ON/OFF 토글 + 계정 로그인/로그아웃
         final com.themoon.y1.managers.LastFmScrobbler scrobbler = com.themoon.y1.managers.LastFmScrobbler.getInstance(this);
-        final LinearLayout btnScrobbleToggle = createSettingRow(t("Scrobble to Last.fm"),
+        final LinearLayout btnScrobbleToggle = createSettingRow(t("Sync Scrobbles to Last.fm"),
                 scrobbler.isEnabled() ? t("ON") : t("OFF"));
         btnScrobbleToggle.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -7426,6 +7428,15 @@ public class MainActivity extends Activity {
             });
             containerVideoItems.addView(row);
         }
+
+        // 🚀 [버그 수리] 행을 추가만 하고 아무 데도 포커스를 준 적이 없어서, 휠로 방향키를 눌러도 focusSearch가
+        // "지금 포커스된 뷰"를 못 찾아 아예 움직이지 않았습니다(클릭 피드백 소리만 나고 하이라이트도, 재생도
+        // 안 되던 원인). Settings/Podcasts와 동일하게 첫 번째 행에 명시적으로 포커스를 줍니다.
+        containerVideoItems.post(() -> {
+            if (containerVideoItems.getChildCount() > 0) {
+                containerVideoItems.getChildAt(0).requestFocus();
+            }
+        });
     }
 
     private void openVideoPlayer(int index) {

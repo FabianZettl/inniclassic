@@ -2,6 +2,17 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.3.1] - 2026-07-29
+
+Another round of Reddit-reported bugs, mostly around the Music library screens.
+
+### Fixed
+- **"Albums" was completely broken** — tapping into it either showed a black screen, froze, or silently bounced back to the Music menu. `getAlbumRowView()` was doing a full library scan plus a synchronous `MediaMetadataRetriever` lookup on the UI thread for every row, every time it scrolled into view - fine for a handful of albums, but an ANR/freeze risk for a real-sized library. Cover art lookup now runs on a background thread (placeholder shown immediately, real art swapped in once ready), and the per-album file lookup is precomputed once instead of rescanning the whole library per row.
+- **Videos screen: nothing could be selected or played** — rows were added to the list but never given initial focus, so spinning the wheel had no "current" row to move from (you'd hear the click sound but nothing would highlight or respond). Now the first row gets focus like every other list in the app.
+- **Some FLAC albums showed no cover art in "Albums"** (but did show it correctly on Now Playing/Cover Flow) — the Albums screen's cover lookup skipped embedded art entirely for FLAC files with no fallback, so only albums with a folder `cover.jpg`/`folder.jpg` showed anything. It now uses the same dedicated FLAC metadata parser Now Playing already relies on.
+- **Confusion around Last.fm scrobbling / "where's my .scrobbler.log?"** — the local scrobble log was silently gated behind the "Scrobble to Last.fm" toggle (off by default) even though it's just a private text file that needs no account. It's now written automatically for every played track, no setup required; the Settings toggle (renamed **Sync Scrobbles to Last.fm**) now only controls whether scrobbles are *also* sent to a real Last.fm account. Also documented in the README that `.scrobbler.log` is a dotfile and hidden by default in most file managers.
+- **Cover art looking noticeably blurry/soft while panning** on the Main Menu and Music menu — cover art was always decoded at half resolution (`inSampleSize=2`) regardless of its actual size, which compounded badly for anyone using smaller (e.g. 300×300) cover images against a pan panel rendered near full screen height. Downsampling now only kicks in for genuinely large source images; small covers are decoded at full resolution. README now recommends 600×600 minimum, 1000×1000+ ideally.
+
 ## [1.3.0] - 2026-07-29
 
 A Music Quiz overhaul, a Now Playing polish pass, and another batch of Reddit-reported bugs — mostly sleep/wake and audio.
