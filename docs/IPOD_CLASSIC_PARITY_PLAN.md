@@ -26,15 +26,15 @@ Ordered by "quick + clean to implement" first, working up to the bigger structur
 
 Highest fidelity-per-effort. Do these first.
 
-- [ ] **Music Menu item visibility editor** — same pattern as the existing Main Menu editor, applied to the Cover Flow/Playlists/Artists/Albums/Songs/Genres/Search list
-- [ ] **About screen** — extend/duplicate the Storage screen: add song count, album count, artist count, app version (versionName), device model, cycle-through-screens like the original (Center button)
-- [ ] **Backlight Timer** setting (screen dim/off delay)
-- [ ] **24-Hour Clock** toggle + **Time in Title Bar** toggle (add to existing Date & Time screen)
-- [ ] **Volume Limit** setting (max volume cap; combination-lock part is optional/lower priority)
-- [ ] **Sound Check** toggle (simple version: normalize based on average track loudness sampled during library scan; doesn't need to be perfect)
-- [ ] **Legal** screen (static text screen)
-- [ ] **Reset All Settings** (clear our settings prefs back to defaults)
-- [ ] Search results: small type indicator per row (Song/Artist/Album/Podcast)
+- [x] **Music Menu item visibility editor** — "Music Menu Items" row in Settings, same `hide_btn_<id>` pattern as Main Menu editor
+- [x] **About screen** — Settings → About, song/album/artist counts + version + device model
+- [x] **Backlight Timer** setting — also tuned this since (default lowered from 10s to 1 minute after user reports of the screen feeling too aggressive)
+- [x] **24-Hour Clock** toggle + **Time in Title Bar** toggle — both live as `is24HourFormat`/`isTimeInTitleBar`
+- [x] **Volume Limit** setting — `volumeLimitMax`, Settings → Volume Limit
+- [x] **Sound Check** toggle — `isSoundCheckEnabled`, Settings → Sound Check
+- [x] **Legal** screen — Settings → Legal
+- [x] **Reset All Settings** — Settings → Reset All Settings
+- [ ] Search results: small type indicator per row (Song/Artist/Album/Podcast) — search still dumps everything into the same flat song-list view (`buildVirtualSongs()` with `virtualQueryType = "SEARCH"`), no per-row badge yet. Last real gap in this phase.
 
 ## Phase 2 — Now Playing & library depth (medium effort, high "iPod feel")
 
@@ -73,7 +73,7 @@ Lowest priority / probably skip unless there's real demand: **Contacts**, **Cale
 
 Revisit only after Phases 1–3 are done and if there's still appetite for it.
 
-- [ ] **Videos** top-level playback feature
+- [x] **Videos** top-level playback feature — shipped since 1.2.0 (own "Videos" folder on SD card, full-screen wheel-driven playback, powered by libVLC after ExoPlayer's frame-timing turned out broken on this device's API 17; thumbnails/resume-position still not done)
 - [ ] **Photos** + slideshow (+ optional TV-out, if the hardware even supports it)
 - [ ] **Genius** / Genius Mixes / Genius Playlists — a real recommendation engine is a lot of work; a pragmatic fake version (cluster by genre + artist + similar tempo/decade) could get 80% of the feel for far less effort, worth considering as a scoped-down substitute rather than the full thing
 

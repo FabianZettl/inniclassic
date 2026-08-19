@@ -2,6 +2,13 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.3.2] - 2026-08-03
+
+Small follow-up polish release.
+
+### Fixed
+- **Videos screen looked out of place** compared to every other menu (Settings, Bluetooth, Wi-Fi) — it was missing the uppercase title header those screens have. Added, matching the existing look exactly.
+
 ## [1.3.1] - 2026-07-29
 
 Another round of Reddit-reported bugs, mostly around the Music library screens.
