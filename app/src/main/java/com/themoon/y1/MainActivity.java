@@ -5503,13 +5503,13 @@ public class MainActivity extends Activity {
         tvLeft.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
         tvLeft.setText(t(leftText));
         tvLeft.setTextColor(ThemeManager.getTextColorPrimary());
-        tvLeft.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * settingRowDensity);
+        tvLeft.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 20f * settingRowDensity);
         tvLeft.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f));
 
         TextView tvRight = new TextView(this);
         tvRight.setTypeface(ThemeManager.getCustomFontBold());
         tvRight.setText(rightText);
-        tvRight.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * settingRowDensity);
+        tvRight.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 20f * settingRowDensity);
         tvRight.setTypeface(ThemeManager.getCustomFontBold());
         tvRight.setGravity(Gravity.RIGHT);
         tvRight.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -5635,7 +5635,7 @@ public class MainActivity extends Activity {
         final TextView tvText = new TextView(this);
         tvText.setText(textLabel);
         // 🚀 [Main Menu와 폰트 크기 통일] SP 대신 PX(px) 단위로 강제 고정 - Main Menu 동적 버튼과 100% 동일한 렌더링 크기 보장!
-        tvText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 21f * d);
+        tvText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 23f * d);
         tvText.setTextColor(normalColor); // 🚀 텍스트도 똑같이 도색!
         tvText.setTypeface(ThemeManager.getCustomFontBold());
 
@@ -5833,6 +5833,23 @@ public class MainActivity extends Activity {
             }
         });
         containerSettingsItems.addView(btnSoundCheck);
+
+        // 🚀 [신규 추가] Video: 화면비를 유지한 채(레터박스) 보여줄지, 화면을 완전히 채울지(원본 비율에
+        // 따라 눌리거나 늘어날 수 있음) 선택 - GitHub Issue #7에서 직접 요청받은 기능.
+        final boolean videoStretchFill = prefs.getBoolean("video_stretch_fill", false);
+        final LinearLayout btnVideoFill = createSettingRow("Fill Video Screen",
+                videoStretchFill ? t("ON") : t("OFF"));
+        btnVideoFill.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                boolean newState = !prefs.getBoolean("video_stretch_fill", false);
+                prefs.edit().putBoolean("video_stretch_fill", newState).commit();
+                TextView tvStatus = (TextView) btnVideoFill.getChildAt(1);
+                tvStatus.setText(newState ? t("ON") : t("OFF"));
+            }
+        });
+        containerSettingsItems.addView(btnVideoFill);
 
         // 🚀 [iPod 스타일] Now Playing 화면의 앨범 커버 입체 기울기 켜기/끄기
         final LinearLayout btnAlbumTilt = createSettingRow("Album Cover Tilt", isAlbumTiltEnabled ? t("ON") : t("OFF"));
@@ -7421,7 +7438,7 @@ public class MainActivity extends Activity {
             int dot = title.lastIndexOf(".");
             if (dot > 0) title = title.substring(0, dot);
 
-            View row = createListButtonWithIcon("", title);
+            View row = createVideoRowView(videoFile, title);
             row.setOnClickListener(v -> {
                 clickFeedback();
                 openVideoPlayer(index);
@@ -7437,6 +7454,130 @@ public class MainActivity extends Activity {
                 containerVideoItems.getChildAt(0).requestFocus();
             }
         });
+    }
+
+    // 🚀 [비디오 썸네일 캐시] 프레임 추출은 MediaMetadataRetriever로 하는데 이게 느릴 수 있어서(특히 이
+    // 기기), Albums ANR 버그에서 배운 대로 절대 메인 스레드에서 동기로 하지 않고, 백그라운드 스레드 +
+    // 메모리 캐시로 처리합니다.
+    private LruCache<String, Bitmap> videoThumbCache;
+
+    // 🚀 [신규 추가] 썸네일이 있는 비디오 목록 행 - Albums 행과 같은 느낌(작은 정사각 미리보기 + 제목)이지만
+    // 서브타이틀 없이 단순하게 구성합니다.
+    private View createVideoRowView(final File videoFile, String title) {
+        float d = getResources().getDisplayMetrics().density;
+        int coverSize = (int) (52 * d);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setFocusable(true);
+        row.setClickable(true);
+        row.setSoundEffectsEnabled(false);
+        row.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        row.setPadding((int) (8 * d), (int) (6 * d), (int) (10 * d), (int) (6 * d));
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, 2, 0, 2);
+        row.setLayoutParams(rowLp);
+
+        final ImageView ivThumb = new ImageView(this);
+        ivThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        LinearLayout.LayoutParams thumbLp = new LinearLayout.LayoutParams(coverSize, coverSize);
+        thumbLp.rightMargin = (int) (10 * d);
+        ivThumb.setLayoutParams(thumbLp);
+        row.addView(ivThumb);
+
+        final TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 23f * d);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setSingleLine(true);
+        tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+        tvTitle.setMarqueeRepeatLimit(-1);
+        tvTitle.setHorizontalFadingEdgeEnabled(true);
+        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        tvTitle.setLayoutParams(textLp);
+        row.addView(tvTitle);
+
+        final TextView tvArrow = new TextView(this);
+        tvArrow.setText("〉");
+        tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 20f * d);
+        tvArrow.setTextColor(0xFFFFFFFF);
+        tvArrow.setVisibility(View.GONE);
+        LinearLayout.LayoutParams arrowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        arrowLp.leftMargin = (int) (10 * d);
+        tvArrow.setLayoutParams(arrowLp);
+        row.addView(tvArrow);
+
+        final int normalColor = ThemeManager.getTextColorPrimary();
+        row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    row.setBackground(createFocusedButtonBackground());
+                    tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                    tvTitle.setSelected(true);
+                    tvArrow.setVisibility(View.VISIBLE);
+                    showFastScrollLetter(tvTitle.getText().toString());
+                } else {
+                    row.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    tvTitle.setTextColor(normalColor);
+                    tvTitle.setSelected(false);
+                    tvArrow.setVisibility(View.GONE);
+                }
+            }
+        });
+
+        String path = videoFile.getAbsolutePath();
+        if (videoThumbCache == null) videoThumbCache = new LruCache<>(30);
+        Bitmap cached = videoThumbCache.get(path);
+        if (cached != null) {
+            ivThumb.setImageBitmap(cached);
+        } else {
+            ivThumb.setImageResource(R.drawable.video_circle);
+            ivThumb.setTag(path);
+            loadVideoThumbnailAsync(videoFile, coverSize, ivThumb);
+        }
+
+        return row;
+    }
+
+    private void loadVideoThumbnailAsync(final File videoFile, final int coverSize, final ImageView targetView) {
+        final String path = videoFile.getAbsolutePath();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Bitmap thumb = null;
+                android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
+                try {
+                    mmr.setDataSource(path);
+                    // 🚀 1초 지점에서 프레임을 뽑습니다 - 0초는 종종 완전히 까맣거나 빈 인트로 프레임인 경우가 많습니다.
+                    Bitmap frame = mmr.getFrameAtTime(1000000, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                    if (frame == null) frame = mmr.getFrameAtTime(); // 실패하면 그냥 첫 프레임이라도!
+                    if (frame != null) {
+                        thumb = Bitmap.createScaledBitmap(frame, coverSize, coverSize, true);
+                        if (thumb != frame) frame.recycle();
+                    }
+                } catch (Exception e) {
+                } finally {
+                    try { mmr.release(); } catch (Exception e) {}
+                }
+                final Bitmap finalThumb = thumb;
+                if (finalThumb != null && videoThumbCache != null) {
+                    videoThumbCache.put(path, finalThumb);
+                }
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (finalThumb != null && path.equals(targetView.getTag())) {
+                            targetView.setImageBitmap(finalThumb);
+                        }
+                    }
+                });
+            }
+        }).start();
     }
 
     private void openVideoPlayer(int index) {
@@ -8773,10 +8914,13 @@ public class MainActivity extends Activity {
             }
         }
 
-        // 4. 앨범 이름(폴더 이름)을 기준으로 알파벳순 깔끔한 정렬
+        // 🚀 [피드백 반영] 순수 앨범명 알파벳순이 아니라, 실제 아이팟처럼 아티스트별로 앨범을 묶어서
+        // 정렬합니다 - 아티스트 안에서는 앨범명으로 2차 정렬.
         java.util.Collections.sort(uniqueAlbumList, new java.util.Comparator<SongItem>() {
             @Override
             public int compare(SongItem s1, SongItem s2) {
+                int byArtist = s1.albumArtist.compareToIgnoreCase(s2.albumArtist);
+                if (byArtist != 0) return byArtist;
                 return s1.album.compareToIgnoreCase(s2.album);
             }
         });
@@ -9683,53 +9827,78 @@ public class MainActivity extends Activity {
                 });
                 containerBrowserItems.addView(b);
             }
-            for (final File audio : audioFiles) {
-                // 🚀 [수정 완료] 음악 모드일 때 렌더링되는 아이콘을 '음표(\uE405)'로 교체!
-                String iconCode = (isAudiobookLibraryMode || currentBrowserMode == BROWSER_AUDIOBOOKS) ? "\uE310"
-                        : "\uE405";
-                View b = createListButtonWithIcon(iconCode, audio.getName());
+            // 🚀 [폴더 재생목록 렉 수리] 파일이 많은 폴더(수백 곡을 한 폴더에 몰아넣는 사용자들이 실제로
+            // 있습니다)에서는 이 행들을 전부 한 번에 동기로 만들어 붙이면 UI 스레드가 오래 막혀서 폴더에
+            // 들어갈 때마다 눈에 띄게 버벅였습니다. 25개씩 나눠서 추가하고 매 묶음 사이에 한 프레임을
+            // 양보하여, 총 작업량은 비슷해도 화면이 계속 반응하며 채워지도록 만듭니다.
+            renderAudioFileRowsIncrementally(audioFiles, 0);
+            return;
+        }
+        finishFolderBrowserUIRender();
+    }
 
-                // 🚀 [추가] 오디오북 모드이거나 오디오북 폴더 안이라면 프로그레스 바를 그립니다!
-                if (isAudiobookLibraryMode || currentBrowserMode == BROWSER_AUDIOBOOKS) {
-                    int pos = prefs.getInt("book_pos_" + audio.getAbsolutePath(), 0);
-                    int dur = prefs.getInt("book_dur_" + audio.getAbsolutePath(), 0);
-                    if (pos > 0 && dur > 0) {
-                        setupAudiobookProgress(b, pos, dur); // 💡 새 엔진 호출!
-                    }
+    private static final int FOLDER_ROW_CHUNK_SIZE = 25;
+
+    private void renderAudioFileRowsIncrementally(final List<File> audioFiles, final int startIndex) {
+        int end = Math.min(startIndex + FOLDER_ROW_CHUNK_SIZE, audioFiles.size());
+        for (int i = startIndex; i < end; i++) {
+            containerBrowserItems.addView(buildFolderAudioRow(audioFiles.get(i)));
+        }
+        if (end < audioFiles.size()) {
+            containerBrowserItems.post(new Runnable() {
+                @Override
+                public void run() {
+                    renderAudioFileRowsIncrementally(audioFiles, end);
                 }
+            });
+        } else {
+            finishFolderBrowserUIRender();
+        }
+    }
 
-                b.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        clickFeedback();
-                        if (currentBrowserMode == BROWSER_AUDIOBOOKS) {
-                            com.themoon.y1.managers.AudiobookManager.getInstance(MainActivity.this)
-                                    .setupBookPlaylist(MainActivity.this, audio, currentFolder);
-                        } else {
-                            com.themoon.y1.managers.AudioPlayerManager.getInstance().setupFolderPlaylist(audio,
-                                    currentFolder);
-                        }
-                        // 🚀 [해결] 폴더에서 개별 노래 재생 시 플레이어 화면으로 자동 전환!
-                        changeScreen(STATE_PLAYER);
-                    }
-                });
+    private View buildFolderAudioRow(final File audio) {
+        String iconCode = (isAudiobookLibraryMode || currentBrowserMode == BROWSER_AUDIOBOOKS) ? "\uE310"
+                : "\uE405";
+        View b = createListButtonWithIcon(iconCode, audio.getName());
 
-                b.setOnLongClickListener(new View.OnLongClickListener() {
-                    @Override
-                    public boolean onLongClick(View v) {
-                        clickFeedback();
-                        isLongPressConsumed = true; // 🚀 [버그 해결] 롱클릭 방어막 강제 가동!
-                        if (currentBrowserMode != BROWSER_M3U_SONGS) {
-                            showAddToPlaylistDialog(audio);
-
-                        }
-
-                        return true; // 이벤트 소화 완료!
-                    }
-                });
-                containerBrowserItems.addView(b);
+        if (isAudiobookLibraryMode || currentBrowserMode == BROWSER_AUDIOBOOKS) {
+            int pos = prefs.getInt("book_pos_" + audio.getAbsolutePath(), 0);
+            int dur = prefs.getInt("book_dur_" + audio.getAbsolutePath(), 0);
+            if (pos > 0 && dur > 0) {
+                setupAudiobookProgress(b, pos, dur);
             }
         }
+
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                if (currentBrowserMode == BROWSER_AUDIOBOOKS) {
+                    com.themoon.y1.managers.AudiobookManager.getInstance(MainActivity.this)
+                            .setupBookPlaylist(MainActivity.this, audio, currentFolder);
+                } else {
+                    com.themoon.y1.managers.AudioPlayerManager.getInstance().setupFolderPlaylist(audio,
+                            currentFolder);
+                }
+                changeScreen(STATE_PLAYER);
+            }
+        });
+
+        b.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                clickFeedback();
+                isLongPressConsumed = true;
+                if (currentBrowserMode != BROWSER_M3U_SONGS) {
+                    showAddToPlaylistDialog(audio);
+                }
+                return true;
+            }
+        });
+        return b;
+    }
+
+    private void finishFolderBrowserUIRender() {
         if (containerBrowserItems.getChildCount() > 0)
             containerBrowserItems.getChildAt(0).requestFocus();
 
@@ -12393,7 +12562,12 @@ public class MainActivity extends Activity {
             // 전원 버튼을 흉내 냈는데, 정작 그걸 다시 켜주는 코드가 어디에도 없었습니다 - 이 기기에서는
             // 휠/버튼이 Android의 "wake key"로 등록되어 있지 않아 화면이 꺼진 채로 입력만 앱까지 전달되고
             // (그래서 진동/클릭음은 정상 작동), 화면 자체는 영원히 꺼진 채로 남아있었던 것이 원인입니다.
-            if (!isScreenOnForLock && action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            // 🚀 [주머니 오작동 방지] 처음엔 아무 키에나 반응했는데, 주머니 안에서 눌리는 휠(21/22)이
+            // 진짜 키 입력을 만들어내서 의도치 않게 화면이 켜진다는 신고가 있었습니다 - 가운데 버튼만
+            // "깨우는 키"로 인정합니다(실제 아이팟도 Hold 없이는 완벽히 막을 수는 없지만, 휠보다는
+            // 훨씬 덜 우발적으로 눌립니다).
+            if (!isScreenOnForLock && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
+                    && action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                 try {
                     Runtime.getRuntime().exec(new String[] { "su", "-c", "input keyevent 26" });
                 } catch (Exception e) {
@@ -13179,6 +13353,7 @@ public class MainActivity extends Activity {
                     .remove("time_in_title_bar")
                     .remove("volume_limit_max")
                     .remove("sound_check_enabled")
+                    .remove("video_stretch_fill")
                     .remove("album_tilt_enabled")
                     .remove("backlight_timer_index")
                     .remove("screen_off_control")

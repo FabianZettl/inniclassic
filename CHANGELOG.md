@@ -2,6 +2,28 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.4.1] - 2026-08-28
+
+Another round of Reddit-reported feedback.
+
+### Changed
+- **Larger list/settings text** — Songs/Albums/Artists/Genres/Composers rows, folder browsing, and every Settings row are a bit bigger (title 21→23px, settings rows 18→20px, album subtitle 14→15px).
+- **Cover Flow now groups by artist** — previously sorted purely alphabetically by album title, scattering an artist's albums throughout the list; now sorted by artist first, album second, matching the real iPod Classic.
+
+### Fixed
+- **Folders with many files lagged noticeably when opened** — every row was built synchronously in one go; now built in chunks of 25 with a frame yielded in between, so the screen stays responsive while filling in instead of freezing.
+- **Screen could randomly wake up in a pocket while listening to music** — a side effect of the 1.3.0 fix that made the real screen-off state wake back up on any key press; pocket pressure on the click wheel could trigger it unintentionally. Only the Center button now wakes the real display back up.
+
+## [1.4.0] - 2026-08-28
+
+Video feature catch-up, plus a new boot logo.
+
+### Added
+- **Video thumbnails** — the Videos list now shows a real frame from each file (grabbed ~1s in) instead of a generic icon, loaded in the background so opening the list stays instant even with many videos.
+- **Video resume-position** — playback remembers where you left off (past the first few seconds, short of the last few) and jumps back there next time you open that file; videos watched to the end start over from the beginning like normal.
+- **Fill Video Screen** setting — Settings → Fill Video Screen lets you choose between the original aspect ratio (letterboxed) or stretching to fill the whole screen with no black bars. Direct response to a GitHub issue request.
+- **New boot logo** — replaces the Rockbox-branded splash the ROM's `LOGO` partition had been carrying over since this project's very first release (an artifact of the source device's stock → Rockbox → InniClassic history) with a plain black screen showing "InniClassic".
+
 ## [1.3.2] - 2026-08-03
 
 Small follow-up polish release.

@@ -73,7 +73,7 @@ Lowest priority / probably skip unless there's real demand: **Contacts**, **Cale
 
 Revisit only after Phases 1–3 are done and if there's still appetite for it.
 
-- [x] **Videos** top-level playback feature — shipped since 1.2.0 (own "Videos" folder on SD card, full-screen wheel-driven playback, powered by libVLC after ExoPlayer's frame-timing turned out broken on this device's API 17; thumbnails/resume-position still not done)
+- [x] **Videos** top-level playback feature — shipped since 1.2.0 (own "Videos" folder on SD card, full-screen wheel-driven playback, powered by libVLC after ExoPlayer's frame-timing turned out broken on this device's API 17); thumbnails, resume-position, and a Fill Screen aspect-ratio option all added since
 - [ ] **Photos** + slideshow (+ optional TV-out, if the hardware even supports it)
 - [ ] **Genius** / Genius Mixes / Genius Playlists — a real recommendation engine is a lot of work; a pragmatic fake version (cluster by genre + artist + similar tempo/decade) could get 80% of the feel for far less effort, worth considering as a scoped-down substitute rather than the full thing
 

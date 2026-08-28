@@ -133,7 +133,7 @@ public class CategoryListAdapter extends BaseAdapter {
 
             tvTitle = new TextView(MainActivity.instance);
             // 🚀 [Main Menu와 폰트 크기 통일] SP 대신 PX 단위로 강제 고정 - 모든 메뉴 화면에서 100% 동일한 렌더링 크기 보장!
-            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 21f * d);
+            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 23f * d);
             tvTitle.setTypeface(ThemeManager.getCustomFontBold());
             tvTitle.setSingleLine(true);
             tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
@@ -142,7 +142,7 @@ public class CategoryListAdapter extends BaseAdapter {
             textStack.addView(tvTitle);
 
             tvSubtitle = new TextView(MainActivity.instance);
-            tvSubtitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 14f * d);
+            tvSubtitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 15f * d);
             tvSubtitle.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
             tvSubtitle.setSingleLine(true);
             tvSubtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -447,7 +447,7 @@ public class CategoryListAdapter extends BaseAdapter {
             tvMain.setMarqueeRepeatLimit(-1);
             tvMain.setHorizontalFadingEdgeEnabled(true);
             tvMain.setTypeface(ThemeManager.getCustomFontBold());
-            tvMain.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 21f * d);
+            tvMain.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 23f * d);
             LinearLayout.LayoutParams lpMain = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
             tvMain.setLayoutParams(lpMain);
