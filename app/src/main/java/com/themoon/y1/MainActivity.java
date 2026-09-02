@@ -1015,7 +1015,7 @@ public class MainActivity extends Activity {
                 int state = intent.getIntExtra("state", -1);
                 if (state == 1) {
                     ivStatusHeadphone.setVisibility(View.VISIBLE);
-                    ivStatusHeadphone.setColorFilter(0xFFFFFFFF);
+                    ivStatusHeadphone.setColorFilter(ThemeManager.getTextColorPrimary());
                 } else {
                     ivStatusHeadphone.setVisibility(View.GONE);
                 }
@@ -1023,7 +1023,7 @@ public class MainActivity extends Activity {
                 int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
                 if (state == BluetoothAdapter.STATE_ON) {
                     ivStatusBluetooth.setVisibility(View.VISIBLE);
-                    ivStatusBluetooth.setColorFilter(0xFFFFFFFF);
+                    ivStatusBluetooth.setColorFilter(ThemeManager.getTextColorPrimary());
                     BluetoothAdapter.getDefaultAdapter().getProfileProxy(context,
                             new BluetoothProfile.ServiceListener() {
                                 @Override
@@ -2370,13 +2370,13 @@ public class MainActivity extends Activity {
             if (audioManager.isWiredHeadsetOn()) {
                 ivStatusHeadphone.setVisibility(View.VISIBLE);
                 // 💡 (보너스) 유선 이어폰 꼈을 때 나오는 하늘색(0xFF00FFFF)도 통일감을 위해 흰색으로 바꾸시면 예쁩니다!
-                ivStatusHeadphone.setColorFilter(0xFFFFFFFF);
+                ivStatusHeadphone.setColorFilter(ThemeManager.getTextColorPrimary());
             }
             BluetoothAdapter ba = BluetoothAdapter.getDefaultAdapter();
             if (ba != null && ba.isEnabled()) {
                 ivStatusBluetooth.setVisibility(View.VISIBLE);
                 // 🚀 [수정] 여기도 파란색을 깔끔한 흰색으로 변경!
-                ivStatusBluetooth.setColorFilter(0xFFFFFFFF);
+                ivStatusBluetooth.setColorFilter(ThemeManager.getTextColorPrimary());
             }
             WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
             if (wm != null && wm.isWifiEnabled()) {
@@ -8514,6 +8514,11 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 final List<SongItem> episodes = new ArrayList<>();
+                // 🚀 [버그 수리] 아래 catch가 실제 에러를 통째로 삼켜버려서, 원인이 뭐든(잘못된 URL,
+                // SSL 실패, 404, XML 파싱 실패 등) 항상 똑같이 "No internet connection"만 떴습니다 -
+                // 진짜 인터넷이 되는데도 이 메시지가 뜨면 사용자는 자기 와이파이를 의심할 수밖에 없었습니다.
+                // 실패 원인을 붙잡아뒀다가 아래에서 그대로 보여줍니다.
+                final Exception[] fetchError = new Exception[1];
                 try {
                     okhttp3.OkHttpClient.Builder builder = new okhttp3.OkHttpClient.Builder();
 
@@ -8654,8 +8659,7 @@ public class MainActivity extends Activity {
                         }
                     }
                 } catch (final Exception e) {
-                    // runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "🚨 통신
-                    // 에러: " + e.toString(), android.widget.Toast.LENGTH_LONG).show());
+                    fetchError[0] = e;
                 }
 
                 runOnUiThread(new Runnable() {
@@ -8690,8 +8694,12 @@ public class MainActivity extends Activity {
                             }
 
                             if (episodes.isEmpty()) {
+                                String detail = fetchError[0] != null
+                                        ? fetchError[0].getClass().getSimpleName()
+                                                + (fetchError[0].getMessage() != null ? ": " + fetchError[0].getMessage() : "")
+                                        : t("no episodes found in feed");
                                 Toast.makeText(MainActivity.this,
-                                        "📡 " + t("No internet connection and no downloaded files."), Toast.LENGTH_LONG)
+                                        "📡 " + t("Couldn't load this feed") + " (" + detail + ")", Toast.LENGTH_LONG)
                                         .show();
                             } else {
                                 Toast.makeText(MainActivity.this,

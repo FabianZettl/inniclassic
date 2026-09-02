@@ -2,6 +2,18 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.4.2] - 2026-09-02
+
+Theme-consistency and Podcasts fixes from user feedback.
+
+### Fixed
+- **Status bar headphone/Bluetooth icons were hardcoded white**, making them nearly invisible on the light iPod Classic theme's light gray status bar. Now use the theme's own text color like the rest of the status bar.
+- **On-screen keyboard's selected character was unreadable on the light theme** — pure white text on a barely-tinted overlay meant it could blend into a light background almost completely. The keyboard panel's backdrop is now solidly dark so the white text always has real contrast, regardless of theme.
+- **Podcast episode loading always said "No internet connection"** even when the real problem was something else entirely (a bad feed URL, a server error, an expired certificate, malformed XML, etc.) — the actual error was being silently discarded. The toast now shows the real failure reason so it's actually possible to diagnose.
+
+### Added
+- **`tools/airpods_fix/`** — an experimental, opt-in fix for AirPods Pro 2 connecting over Bluetooth but staying silent, ported from [Semy0nBu/y1-airpods-rtpfix](https://github.com/Semy0nBu/y1-airpods-rtpfix) (all credit for the original fix goes there). Not bundled into the ROM or APK — it replaces a system-level Bluetooth driver, which is riskier and affects all Bluetooth devices, not just AirPods, so it ships as a separate, clearly-documented install/uninstall script pair instead of being forced on everyone. See its README for details and the exact risk tradeoffs before using it.
+
 ## [1.4.1] - 2026-08-28
 
 Another round of Reddit-reported feedback.
