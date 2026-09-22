@@ -54,7 +54,7 @@ public class BatteryIconView extends View {
     }
 
     public void setBatteryLevel(int level, boolean isCharging) {
-        this.level = level;
+        this.level = Math.max(0, Math.min(100, level));
         this.isCharging = isCharging;
         invalidate(); // 값이 바뀌면 즉시 화면을 다시 그립니다!
     }
@@ -74,7 +74,7 @@ public class BatteryIconView extends View {
 
         float terminalWidth = w * 0.08f; // 우측 볼록 튀어나온 단자 길이
         float shellWidth = w - terminalWidth;
-        float pillRadius = h / 2f; // 🚀 [iPod 스타일] 완전히 둥근 알약(pill) 모양
+        float pillRadius = h * 0.12f; // 🚀 [iPod 스타일] 완전히 둥근 알약(pill) 모양
 
         // 🚀 1. 상태별 색상 자동 전환 (충전 중: 초록 / 20% 이하: 빨강 / 평소: 초록 그라데이션)
         int currentColor = color;
@@ -113,7 +113,7 @@ public class BatteryIconView extends View {
         // 잔량이 0보다 클 때만 알맹이를 그립니다.
         if (currentFillWidth > 0) {
             rectFill.set(padding, padding, padding + currentFillWidth, h - padding);
-            canvas.drawRoundRect(rectFill, pillRadius - padding, pillRadius - padding, paintFill);
+            canvas.drawRoundRect(rectFill, Math.max(0f, pillRadius - padding), Math.max(0f, pillRadius - padding), paintFill);
         }
 
         // 🚀 5. 충전 중이면 배터리 정중앙에 작은 번개 아이콘을 그려 넣습니다!

@@ -2,6 +2,27 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.4.3] - 2026-09-22
+
+A theme-consistency pass plus a round of real correctness/security fixes underneath, including a Last.fm crash and a Wireless PC Upload path-traversal issue.
+
+### Changed
+- **Classic themes tightened up**: edge-to-edge, tighter main-menu rows; consistent 21dp bold list type; saturated blue selection gradient shared by both the dynamic menus and library lists; silver status-bar gradient, darker secondary text, and more compact chevrons. Existing Nimbus Sans regular/bold font files are unchanged.
+- Battery silhouette is more rectangular, and battery percentage is now clamped to 0–100 (guards against a reading briefly overshooting during charge-state transitions).
+- Main Menu, Cover Flow, Wi-Fi and equalizer views now use generated Android view IDs with a stable logical-key mapping, instead of ad hoc constants — reduces the risk of ID collisions as the UI grows.
+
+### Fixed
+- **Last.fm scrobbling could crash its background worker outright** — the pending-scrobble queue called `JSONArray.remove(int)`, which doesn't exist on the Y1's Android API 17 (added in API 19). Replaced with a manual queue-trim helper. Also: Last.fm can return HTTP 200 with an API-level error payload, which was previously treated as a successful scrobble and silently dropped from the retry queue — now correctly kept queued for retry.
+- **Wireless PC Upload (the web server) had a path-traversal weakness** — uploaded/renamed file paths weren't confined to the shared folder. All file operations now resolve and canonicalize against the shared root and reject anything that escapes it, reject cross-origin writes, and render filenames as plain text (not raw HTML) in the browser UI. Interrupted uploads now write to a temp file and atomically replace the target only once complete, so a dropped connection can no longer corrupt or truncate an existing file.
+- Server connections now have timeouts and a bounded worker pool instead of growing unbounded; shutdown properly closes active sockets; large directory listings are read in batches instead of all at once.
+- Recycled album rows in the library list could show a stale cover art thumbnail if a newer request for that row was still in flight when it got recycled for a different album; also fixes focus/marquee highlighting not always restoring correctly on a recycled row.
+- Removed a duplicate broadcast-receiver registration and duplicate manifest permission entries; added the newer Android receiver-flags overload (with a documented fallback for API 17, which predates it) and additional Bluetooth/location permission checks before use.
+- Sound Check no longer calls an API-19-only method unguarded on this API-17 device.
+- Launcher icons switched from WebP to PNG for reliable API 17 rendering; fixed a malformed vector icon path.
+- Audiobook bookmark saving now checks that the playlist index is still valid before writing, guarding against a save racing the Activity being destroyed.
+
+Full engineering write-up, including what was and wasn't independently verifiable before hardware testing: [`docs/release-review-1.4.3.md`](docs/release-review-1.4.3.md).
+
 ## [1.4.2] - 2026-09-02
 
 Theme-consistency and Podcasts fixes from user feedback.

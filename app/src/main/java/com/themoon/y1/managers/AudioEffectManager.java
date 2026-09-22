@@ -71,7 +71,7 @@ public class AudioEffectManager {
     // 🎧 [iPod 스타일] Sound Check - 켜져 있으면 살짝 음압을 보정해 곡마다 체감 음량 차이를 줄여줍니다
     public void applySoundCheck() {
         MainActivity main = MainActivity.instance;
-        if (main == null || main.loudnessEnhancer == null) return;
+        if (android.os.Build.VERSION.SDK_INT < 19 || main == null || main.loudnessEnhancer == null) return;
         try {
             if (main.isSoundCheckEnabled) {
                 main.loudnessEnhancer.setTargetGain(500); // 500 mB = 5dB 보정

@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/Device-Innioasis%20Y1%20only-blue?style=flat-square" alt="Device">
   <img src="https://img.shields.io/badge/Status-Beta-Orange?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/Version-1.4.2-informational?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.4.3-informational?style=flat-square" alt="Version">
   <a href="https://buymeacoffee.com/gz17egcara"><img src="https://img.shields.io/badge/Buy%20me%20a-coffee-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 

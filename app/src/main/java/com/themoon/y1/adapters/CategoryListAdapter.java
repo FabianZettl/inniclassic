@@ -17,6 +17,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.themoon.y1.MainActivity;
+import com.themoon.y1.views.ClassicMenuStyle;
 import com.themoon.y1.R;
 import com.themoon.y1.ThemeManager;
 import com.themoon.y1.models.SongItem;
@@ -133,7 +134,7 @@ public class CategoryListAdapter extends BaseAdapter {
 
             tvTitle = new TextView(MainActivity.instance);
             // 🚀 [Main Menu와 폰트 크기 통일] SP 대신 PX 단위로 강제 고정 - 모든 메뉴 화면에서 100% 동일한 렌더링 크기 보장!
-            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 23f * d);
+            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
             tvTitle.setTypeface(ThemeManager.getCustomFontBold());
             tvTitle.setSingleLine(true);
             tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
@@ -169,6 +170,12 @@ public class CategoryListAdapter extends BaseAdapter {
         // 🚀 [흰색 화살표 고정] Songs 목록(createListButtonWithIcon)과 동일하게 테마색이 아닌 순백색으로 고정합니다.
         tvArrow.setTextColor(0xFFFFFFFF);
         tvArrow.setVisibility(row.isFocused() ? View.VISIBLE : View.GONE);
+
+        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64);
+        ivCover.setTag(name); // Invalidate any previous asynchronous binding, including cached rows.
+        row.setBackground(row.isFocused() ? MainActivity.instance.createFocusedButtonBackground()
+                : MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        tvTitle.setSelected(row.isFocused());
 
         final boolean isAllSongsRow = MainActivity.ALL_SONGS_SENTINEL.equals(name);
 
@@ -447,7 +454,7 @@ public class CategoryListAdapter extends BaseAdapter {
             tvMain.setMarqueeRepeatLimit(-1);
             tvMain.setHorizontalFadingEdgeEnabled(true);
             tvMain.setTypeface(ThemeManager.getCustomFontBold());
-            tvMain.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 23f * d);
+            tvMain.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
             LinearLayout.LayoutParams lpMain = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
             tvMain.setLayoutParams(lpMain);
@@ -465,6 +472,8 @@ public class CategoryListAdapter extends BaseAdapter {
             row.addView(tvArrow);
         }
 
+        ClassicMenuStyle.apply(row, tvMain, tvArrow, ClassicMenuStyle.ROW_HEIGHT_DP);
+        tvMain.setSelected(row.isFocused());
         tvMain.setText(name);
 
         // 🚀 [버그 수정] 재활용된 행이 실제로는 포커스 상태인데도 무조건 평상시 배경으로 덮어써버리던

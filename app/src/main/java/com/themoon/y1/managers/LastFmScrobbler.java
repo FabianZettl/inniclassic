@@ -307,10 +307,17 @@ public class LastFmScrobbler {
             entry.put("duration", durationSec);
             entry.put("timestamp", timestampSec);
             queue.put(entry);
-            while (queue.length() > MAX_PENDING_QUEUE) queue.remove(0);
+            if (queue.length() > MAX_PENDING_QUEUE) queue = queueTail(queue, queue.length() - MAX_PENDING_QUEUE);
             prefs.edit().putString("pending_queue", queue.toString()).apply();
         } catch (Exception ignored) {
         }
+    }
+
+    // JSONArray.remove is API 19; the Y1 runs API 17.
+    private static JSONArray queueTail(JSONArray source, int start) throws org.json.JSONException {
+        JSONArray result = new JSONArray();
+        for (int i = start; i < source.length(); i++) result.put(source.get(i));
+        return result;
     }
 
     private JSONArray loadQueue() throws Exception {
@@ -327,7 +334,8 @@ public class LastFmScrobbler {
                 boolean ok = submitScrobble(sk, entry.getString("artist"), entry.optString("album", ""),
                         entry.getString("title"), entry.getLong("duration"), entry.getLong("timestamp"));
                 if (!ok) break; // stop on first failure (offline/rate limited) - keep order, retry later
-                queue.remove(0);
+                queue = queueTail(queue, 1);
+                prefs.edit().putString("pending_queue", queue.toString()).apply();
             }
             prefs.edit().putString("pending_queue", queue.toString()).apply();
         } catch (Exception ignored) {
@@ -352,7 +360,10 @@ public class LastFmScrobbler {
 
             Request request = new Request.Builder().url(API_ROOT).post(form.build()).build();
             try (Response response = client.newCall(request).execute()) {
-                return response.isSuccessful();
+                if (!response.isSuccessful() || response.body() == null) return false;
+                JSONObject result = new JSONObject(response.body().string());
+                // API errors can arrive with HTTP 200. Keep these queued for retry.
+                return !result.has("error") && result.optJSONObject("scrobbles") != null;
             }
         } catch (Exception e) {
             return false;

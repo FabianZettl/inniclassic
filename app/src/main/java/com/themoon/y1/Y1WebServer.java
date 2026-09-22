@@ -1,6 +1,7 @@
 package com.themoon.y1;
 
 import android.content.Context;
+import com.themoon.y1.io.SafeFiles;
 import android.net.wifi.WifiManager;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -18,28 +19,53 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class Y1WebServer extends Thread {
-    private ServerSocket serverSocket;
-    private boolean running = true;
-    private File rootFolder;
+    private volatile ServerSocket serverSocket;
+    private final java.util.Set<Socket> clients = java.util.Collections.synchronizedSet(new java.util.HashSet<Socket>());
+    private final java.util.concurrent.ThreadPoolExecutor workers = new java.util.concurrent.ThreadPoolExecutor(
+            2, 4, 30, TimeUnit.SECONDS, new java.util.concurrent.ArrayBlockingQueue<Runnable>(8));
+    private volatile boolean running = true;
+    private final File rootFolder;
+    private final int port;
     private Context context;
 
-    public Y1WebServer(Context context, File originalRootFolder) {
+    public Y1WebServer(Context context, File rootFolder) {
+        this(context, rootFolder, 8080);
+    }
+
+    Y1WebServer(Context context, File rootFolder, int port) {
         this.context = context;
-        this.rootFolder = new File("/storage/sdcard0"); // 🚀 기기 전체 루트 폴더로 고정
+        this.rootFolder = rootFolder.getAbsoluteFile();
+        this.port = port;
+    }
+
+    int getListeningPort() {
+        ServerSocket socket = serverSocket;
+        return socket == null ? -1 : socket.getLocalPort();
     }
 
     public void run() {
         try {
-            serverSocket = new ServerSocket(8080);
+            serverSocket = new ServerSocket(port);
             while (running) {
                 Socket socket = serverSocket.accept();
-                new Thread(new RequestHandler(socket)).start();
+                clients.add(socket);
+                try { workers.execute(new RequestHandler(socket)); }
+                catch (java.util.concurrent.RejectedExecutionException e) {
+                    clients.remove(socket);
+                    socket.close();
+                }
             }
         } catch (Exception e) {}
+        finally { stopServer(); }
     }
 
     public void stopServer() {
         running = false;
+        workers.shutdownNow();
+        synchronized (clients) {
+            for (Socket client : clients) { try { client.close(); } catch (Exception ignored) {} }
+            clients.clear();
+        }
         try { if (serverSocket != null) serverSocket.close(); } catch(Exception e){}
     }
 
@@ -51,16 +77,19 @@ public class Y1WebServer extends Thread {
         } catch (Exception ex) { return "Unknown IP"; }
     }
 
-    private void deleteFileOrFolder(File fileOrDirectory) {
-        if (fileOrDirectory.isDirectory()) {
-            File[] children = fileOrDirectory.listFiles();
-            if (children != null) {
-                for (File child : children) {
-                    deleteFileOrFolder(child);
-                }
-            }
+    private void deleteFileOrFolder(File file) throws java.io.IOException {
+        File base = rootFolder.getCanonicalFile();
+        File canonical = file.getCanonicalFile();
+        if (canonical.equals(base) || !canonical.getPath().startsWith(base.getPath() + File.separator))
+            throw new java.io.IOException("Cannot delete outside shared folder");
+        // Never recurse into symbolic links, including links back to an ancestor.
+        if (!file.getAbsoluteFile().equals(canonical)) throw new java.io.IOException("Cannot delete symbolic link");
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children == null) throw new java.io.IOException("Cannot read folder");
+            for (File child : children) deleteFileOrFolder(child);
         }
-        fileOrDirectory.delete();
+        if (!file.delete()) throw new java.io.IOException("Cannot delete file");
     }
 
     private class RequestHandler implements Runnable {
@@ -73,12 +102,14 @@ public class Y1WebServer extends Thread {
             while ((c = is.read()) != -1) {
                 if (c == '\r') continue;
                 if (c == '\n') break;
+                if (sb.length() >= 8192) throw new java.io.IOException("Header too long");
                 sb.append((char) c);
             }
             return sb.toString();
         }
 
         private String readBody(InputStream is, int contentLength) throws java.io.IOException {
+            if (contentLength < 0 || contentLength > 65536) throw new java.io.IOException("Body too large");
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             byte[] buffer = new byte[8192];
             int totalRead = 0, bytesRead;
@@ -86,6 +117,7 @@ public class Y1WebServer extends Thread {
                 bos.write(buffer, 0, bytesRead);
                 totalRead += bytesRead;
             }
+            if (totalRead != contentLength) throw new java.io.EOFException("Incomplete body");
             return new String(bos.toByteArray(), "UTF-8");
         }
 
@@ -106,6 +138,7 @@ public class Y1WebServer extends Thread {
 
         public void run() {
             try {
+                socket.setSoTimeout(15000);
                 InputStream is = socket.getInputStream();
                 OutputStream os = socket.getOutputStream();
 
@@ -113,16 +146,26 @@ public class Y1WebServer extends Thread {
                 if (requestLine == null || requestLine.isEmpty()) return;
 
                 String[] parts = requestLine.split(" ");
+                if (parts.length != 3) throw new java.io.IOException("Invalid request");
                 String method = parts[0];
                 String path = parts[1];
 
                 int contentLength = 0;
                 String line;
+                int headerCount = 0;
+                String origin = null, host = null;
                 while (!(line = readHeaderLine(is)).isEmpty()) {
-                    if (line.toLowerCase().startsWith("content-length:")) {
+                    if (++headerCount > 100) throw new java.io.IOException("Too many headers");
+                    if (line.toLowerCase(Locale.US).startsWith("host:")) host = line.substring(5).trim();
+                    if (line.toLowerCase(Locale.US).startsWith("origin:")) origin = line.substring(7).trim();
+                    if (line.toLowerCase(Locale.US).startsWith("content-length:")) {
                         contentLength = Integer.parseInt(line.split(":")[1].trim());
                     }
                 }
+
+                if ("POST".equals(method) && origin != null && !origin.equals("http://" + host))
+                    throw new java.io.IOException("Cross-origin write rejected");
+                if (contentLength < 0) throw new java.io.IOException("Invalid length");
 
                 // 1️⃣ 화면 UI 전송 (프론트엔드 - 인라인 플레이어 + 🚀 텍스트 에디터 탑재 + 🚀 드래그 앤 드롭 지원)
                 if (method.equals("GET") && path.equals("/")) {
@@ -201,45 +244,31 @@ public class Y1WebServer extends Thread {
                             "</div></div>" +
 
                             "<script>" +
+                            "const nativeFetch = window.fetch.bind(window); window.fetch = (url, options) => nativeFetch(url, options).then(r => { if (!r.ok) { document.getElementById('status').textContent = 'Request failed (' + r.status + ')'; throw Error('Request failed'); } return r; });" +
                             "let currentPath = '';" +
                             "function loadList() {" +
-                            "  fetch('/api/list?dir=' + encodeURIComponent(currentPath)).then(r=>r.json()).then(data => {" +
-                            "    document.getElementById('currentPathText').innerText = '/' + currentPath;" +
-                            "    let html = '';" +
-                            "    if(currentPath !== '') html += `<div class='item' onclick='goUp()'><div class='item-left'><div class='icon'>🔙</div><b style='color:#B39DDB;'>[Go Back]</b></div></div>`;" +
-                            "    data.forEach(f => {" +
-                            "      let ext = f.name.split('.').pop().toLowerCase();" +
-                            "      let isImg = ['jpg','jpeg','png','webp','gif'].includes(ext);" +
-                            "      let isAudio = ['mp3','flac','wav','ogg','m4a','aac'].includes(ext);" +
-                            "      let isText = ['json','txt','xml','ini','md','m3u','m3u8','eq'].includes(ext);" +
-                            "      let fullPath = currentPath ? currentPath + '/' + f.name : f.name;" +
-                            "      let safePath = encodeURIComponent(fullPath);" +
-
-                            "      let iconHtml = f.isDir ? `<div class='icon'>📁</div>` : " +
-                            "                     isImg ? `<img src='/api/file?path=${safePath}' class='thumb' loading='lazy'>` : " +
-                            "                     isAudio ? `<div class='icon'>🎵</div>` : " +
-                            "                     isText ? `<div class='icon'>📝</div>` : `<div class='icon'>📄</div>`;" +
-
-                            "      let rowAction = f.isDir ? `onclick=\"goInto('${f.name.replace(/'/g, \"\\\\'\")}')\"` : " +
-                            "                      isAudio ? `onclick=\"playAudio('${safePath}', '${f.name.replace(/'/g, \"\\\\'\")}')\"` : " +
-                            "                      isText ? `onclick=\"openEditor(event, '${safePath}', '${f.name.replace(/'/g, \"\\\\'\")}')\"` : " +
-                            "                      isImg ? `onclick=\"window.open('/api/file?path=${safePath}', '_blank')\"` : '';" +
-
-                            // (기존 코드)
-                            "      let editBtn = isText ? `<button class='action' onclick=\"openEditor(event, '${safePath}', '${f.name.replace(/'/g, \"\\\\'\")}')\">Edit</button>` : '';" +
-                            "      let renameBtn = `<button class='action' onclick=\"renameItem(event, '${f.name.replace(/'/g, \"\\\\'\")}')\">Rename</button>`;" +
-
-                            // 🚀 [여기서부터 수정!] 다운로드 버튼 변수를 새로 만들고, html += 조립 부분에 ${downloadBtn}을 끼워 넣습니다.
-                            "      let downloadBtn = f.isDir ? '' : `<button class='action' style='background:#81C784; color:#121212;' onclick=\"event.stopPropagation(); window.location.href='/api/download?path=${safePath}';\">⬇️ Down</button>`;" +
-
-                            "      html += `<div class='item' ${rowAction}>` +" +
-                            "              `<div class='item-left'>${iconHtml}<span class='item-name'>${f.name}</span></div>` +" +
-                            "              `<div class='btn-group'>${downloadBtn}${editBtn}${renameBtn}<button class='danger' onclick=\"deleteItem(event, '${f.name.replace(/'/g, \"\\\\'\")}')\">Delete</button></div>` +" +
-                            "              `</div>`;" +
-                            "    });" +
-                            "    if(data.length===0 && currentPath === '') html += '<div style=\"padding:15px; color:#9E9E9E;\">No files found.</div>';" +
-                            "    document.getElementById('fileList').innerHTML = html;" +
-                            "  });" +
+                            " fetch('/api/list?dir=' + encodeURIComponent(currentPath)).then(r=>{if(!r.ok) throw Error('Cannot load folder'); return r.json();}).then(data=>{" +
+                            " document.getElementById('currentPathText').textContent='/' + currentPath;" +
+                            " const list=document.getElementById('fileList'); list.textContent='';" +
+                            " function button(row,label,action) {const b=document.createElement('button');b.className='action';b.textContent=label;b.onclick=e=>{e.stopPropagation();action(e);};row.appendChild(b);}" +
+                            " if(currentPath) {const back=document.createElement('div');back.className='item';back.textContent='\u2190 Go Back';back.onclick=goUp;list.appendChild(back);}" +
+                            " data.forEach(f=>{" +
+                            " const row=document.createElement('div');row.className='item';" +
+                            " const label=document.createElement('span');label.className='item-name';label.textContent=(f.isDir?'\ud83d\udcc1 ':'')+f.name;row.appendChild(label);" +
+                            " const path=encodeURIComponent(currentPath?currentPath+'/'+f.name:f.name);" +
+                            " const ext=f.name.split('.').pop().toLowerCase();" +
+                            " if(f.isDir) row.onclick=()=>goInto(f.name);" +
+                            " else {" +
+                            " if(['jpg','jpeg','png','webp','gif'].includes(ext)) {const image=document.createElement('img');image.className='thumb';image.src='/api/file?path='+path;image.loading='lazy';row.insertBefore(image,label);row.onclick=()=>window.open('/api/file?path='+path,'_blank');}" +
+                            " if(['mp3','flac','wav','ogg','opus','m4a','aac'].includes(ext)) row.onclick=()=>playAudio(path,f.name);" +
+                            " if(['json','txt','xml','ini','md','m3u','m3u8','eq'].includes(ext)) button(row,'Edit',e=>openEditor(e,path,f.name));" +
+                            " button(row,'Download',()=>{window.location.href='/api/download?path='+path;});" +
+                            " }" +
+                            " button(row,'Rename',e=>renameItem(e,f.name));" +
+                            " button(row,'Delete',e=>deleteItem(e,f.name));" +
+                            " list.appendChild(row);" +
+                            " });" +
+                            " }).catch(e=>{document.getElementById('status').textContent=e.message;});" +
                             "}" +
                             "function goInto(dirName) { currentPath = currentPath ? currentPath + '/' + dirName : dirName; loadList(); }" +
                             "function goUp() { let parts = currentPath.split('/'); parts.pop(); currentPath = parts.join('/'); loadList(); }" +
@@ -332,10 +361,11 @@ public class Y1WebServer extends Thread {
                             "    } else if(item.isDirectory) { " +
                             "      let dirReader = item.createReader(); " +
                             "      pending++; " +
-                            "      dirReader.readEntries(entries => { " +
+                            "      function readBatch() { dirReader.readEntries(entries => { " +
+                            "        if(!entries.length) { pending--; checkDone(); return; } " +
                             "        entries.forEach(entry => scanEntry(entry, path + item.name + '/')); " +
-                            "        pending--; checkDone(); " +
-                            "      }); " +
+                            "        readBatch(); " +
+                            "      }, () => { pending--; document.getElementById('status').textContent='Cannot read dropped folder'; }); } readBatch(); " +
                             "    } " +
                             "  } " +
                             "  function checkDone() { " +
@@ -361,7 +391,7 @@ public class Y1WebServer extends Thread {
                     String dirStr = "";
                     if (q.startsWith("dir=")) dirStr = URLDecoder.decode(q.substring(4), "UTF-8");
 
-                    File targetDir = dirStr.isEmpty() ? rootFolder : new File(rootFolder, dirStr);
+                    File targetDir = dirStr.isEmpty() ? rootFolder : SafeFiles.resolve(rootFolder, dirStr);
                     StringBuilder json = new StringBuilder("[");
 
                     if (targetDir.exists() && targetDir.isDirectory()) {
@@ -372,7 +402,7 @@ public class Y1WebServer extends Thread {
                                     boolean isDir = f.isDirectory();
                                     if ((i == 0 && isDir) || (i == 1 && !isDir)) {
                                         if (json.length() > 1) json.append(",");
-                                        json.append("{\"name\":\"").append(f.getName().replace("\"", "\\\"")).append("\",\"isDir\":").append(isDir).append("}");
+                                        json.append("{\"name\":").append(org.json.JSONObject.quote(f.getName())).append(",\"isDir\":").append(isDir).append("}");
                                     }
                                 }
                             }
@@ -391,9 +421,9 @@ public class Y1WebServer extends Thread {
                         if (p.startsWith("dir=")) dirStr = URLDecoder.decode(p.substring(4), "UTF-8");
                         if (p.startsWith("name=")) name = URLDecoder.decode(p.substring(5), "UTF-8");
                     }
-                    File targetDir = dirStr.isEmpty() ? rootFolder : new File(rootFolder, dirStr);
-                    File newDir = new File(targetDir, name);
-                    newDir.mkdirs();
+                    File targetDir = dirStr.isEmpty() ? rootFolder : SafeFiles.resolve(rootFolder, dirStr);
+                    File newDir = SafeFiles.child(targetDir, name);
+                    if (!newDir.isDirectory() && !newDir.mkdirs()) throw new java.io.IOException("Cannot create folder");
                     os.write("HTTP/1.1 200 OK\r\n\r\nOK".getBytes("UTF-8"));
                 }
 
@@ -401,7 +431,8 @@ public class Y1WebServer extends Thread {
                 else if (method.equals("POST") && path.startsWith("/api/delete")) {
                     String q = path.split("\\?")[1];
                     String targetPath = URLDecoder.decode(q.substring(5), "UTF-8");
-                    File targetFile = new File(rootFolder, targetPath);
+                    File targetFile = SafeFiles.resolve(rootFolder, targetPath);
+                    if (targetFile.equals(rootFolder.getCanonicalFile())) throw new java.io.IOException("Cannot delete root");
                     if (targetFile.exists()) {
                         deleteFileOrFolder(targetFile);
                     }
@@ -419,13 +450,14 @@ public class Y1WebServer extends Thread {
                         if (p.startsWith("new=")) newName = URLDecoder.decode(p.substring(4), "UTF-8");
                     }
 
-                    File targetDir = dirStr.isEmpty() ? rootFolder : new File(rootFolder, dirStr);
-                    File oldFile = new File(targetDir, oldName);
-                    File newFile = new File(targetDir, newName);
+                    File targetDir = dirStr.isEmpty() ? rootFolder : SafeFiles.resolve(rootFolder, dirStr);
+                    File oldFile = SafeFiles.child(targetDir, oldName);
+                    File newFile = SafeFiles.child(targetDir, newName);
 
                     // 기존 파일이 존재하고 새 이름의 파일이 없을 때만 안전하게 이름 변경 실행
+                    if (!oldFile.exists() || newFile.exists()) throw new java.io.IOException("Invalid rename");
                     if (oldFile.exists() && !newFile.exists()) {
-                        oldFile.renameTo(newFile);
+                        if (!oldFile.renameTo(newFile)) throw new java.io.IOException("Cannot rename file");
                     }
                     os.write("HTTP/1.1 200 OK\r\n\r\nOK".getBytes("UTF-8"));
                 }
@@ -436,7 +468,7 @@ public class Y1WebServer extends Thread {
                 else if (method.equals("GET") && path.startsWith("/api/file")) {
                     String q = path.split("\\?")[1];
                     String targetPath = URLDecoder.decode(q.substring(5), "UTF-8");
-                    File targetFile = new File(rootFolder, targetPath);
+                    File targetFile = SafeFiles.resolve(rootFolder, targetPath);
 
                     if (!targetFile.exists() || targetFile.isDirectory()) {
                         os.write("HTTP/1.1 404 Not Found\r\n\r\nNot Found".getBytes("UTF-8"));
@@ -457,16 +489,16 @@ public class Y1WebServer extends Thread {
                         String header = "HTTP/1.1 200 OK\r\n" +
                                 "Content-Type: " + mimeType + "\r\n" +
                                 "Content-Length: " + targetFile.length() + "\r\n" +
-                                "Accept-Ranges: bytes\r\n\r\n";
+                                "Connection: close\r\n\r\n";
                         os.write(header.getBytes("UTF-8"));
 
-                        FileInputStream fis = new FileInputStream(targetFile);
+                        try (FileInputStream fis = new FileInputStream(targetFile)) {
                         byte[] buffer = new byte[8192];
                         int bytesRead;
                         while ((bytesRead = fis.read(buffer)) != -1) {
                             os.write(buffer, 0, bytesRead);
                         }
-                        fis.close();
+                        }
                     }
                 }
 
@@ -480,21 +512,11 @@ public class Y1WebServer extends Thread {
                         if (p.startsWith("name=")) name = URLDecoder.decode(p.substring(5), "UTF-8");
                     }
 
-                    File targetDir = dirStr.isEmpty() ? rootFolder : new File(rootFolder, dirStr);
-                    if (!targetDir.exists()) targetDir.mkdirs();
-                    File outFile = new File(targetDir, name);
+                    File targetDir = dirStr.isEmpty() ? rootFolder : SafeFiles.resolve(rootFolder, dirStr);
+                    if (!targetDir.isDirectory() && !targetDir.mkdirs()) throw new java.io.IOException("Cannot create folder");
+                    File outFile = SafeFiles.child(targetDir, name);
 
-                    FileOutputStream fos = new FileOutputStream(outFile);
-                    byte[] buffer = new byte[8192];
-                    int bytesRead;
-                    int totalRead = 0;
-                    while (totalRead < contentLength && (bytesRead = is.read(buffer, 0, Math.min(buffer.length, contentLength - totalRead))) != -1) {
-                        fos.write(buffer, 0, bytesRead);
-                        totalRead += bytesRead;
-                    }
-                    fos.flush();
-                    try { fos.getFD().sync(); } catch(Exception e){}
-                    fos.close();
+                    SafeFiles.replace(outFile, is, contentLength);
 
                     os.write("HTTP/1.1 200 OK\r\n\r\nOK".getBytes("UTF-8"));
                 }
@@ -503,27 +525,16 @@ public class Y1WebServer extends Thread {
                 else if (method.equals("POST") && path.startsWith("/api/save")) {
                     String q = path.split("\\?")[1];
                     String targetPath = URLDecoder.decode(q.substring(5), "UTF-8");
-                    File targetFile = new File(rootFolder, targetPath);
+                    File targetFile = SafeFiles.resolve(rootFolder, targetPath);
 
-                    FileOutputStream fos = new FileOutputStream(targetFile);
-                    byte[] buffer = new byte[8192];
-                    int bytesRead;
-                    int totalRead = 0;
-                    // 전달받은 텍스트 몸통(Body)을 파일로 그대로 쭉 밀어 넣습니다.
-                    while (totalRead < contentLength && (bytesRead = is.read(buffer, 0, Math.min(buffer.length, contentLength - totalRead))) != -1) {
-                        fos.write(buffer, 0, bytesRead);
-                        totalRead += bytesRead;
-                    }
-                    fos.flush();
-                    try { fos.getFD().sync(); } catch(Exception e){}
-                    fos.close();
+                    SafeFiles.replace(targetFile, is, contentLength);
 
                     os.write("HTTP/1.1 200 OK\r\n\r\nOK".getBytes("UTF-8"));
                 }
                 else if (method.equals("GET") && path.startsWith("/api/download")) {
                     String q = path.split("\\?")[1];
                     String targetPath = URLDecoder.decode(q.substring(5), "UTF-8");
-                    File targetFile = new File(rootFolder, targetPath);
+                    File targetFile = SafeFiles.resolve(rootFolder, targetPath);
 
                     if (!targetFile.exists() || targetFile.isDirectory()) {
                         os.write("HTTP/1.1 404 Not Found\r\n\r\nNot Found".getBytes("UTF-8"));
@@ -531,18 +542,18 @@ public class Y1WebServer extends Thread {
                         // 💡 브라우저가 화면에 재생하지 않고 "무조건 파일로 저장"하게 만드는 Content-Disposition 헤더!
                         String header = "HTTP/1.1 200 OK\r\n" +
                                 "Content-Type: application/octet-stream\r\n" +
-                                "Content-Disposition: attachment; filename=\"" + targetFile.getName() + "\"\r\n" +
+                                "Content-Disposition: attachment; filename=\"" + targetFile.getName().replaceAll("[\\r\\n\"\\\\]", "_") + "\"\r\n" +
                                 "Content-Length: " + targetFile.length() + "\r\n" +
-                                "Accept-Ranges: bytes\r\n\r\n";
+                                "Connection: close\r\n\r\n";
                         os.write(header.getBytes("UTF-8"));
 
-                        FileInputStream fis = new FileInputStream(targetFile);
+                        try (FileInputStream fis = new FileInputStream(targetFile)) {
                         byte[] buffer = new byte[8192];
                         int bytesRead;
                         while ((bytesRead = fis.read(buffer)) != -1) {
                             os.write(buffer, 0, bytesRead);
                         }
-                        fis.close();
+                        }
                     }
                 }
                 // 8️⃣ [Last.fm] 로그인 페이지 (PC 브라우저에서 편하게 아이디/비번 입력용)
@@ -572,10 +583,11 @@ public class Y1WebServer extends Thread {
                             "  fetch('/api/lastfm/status').then(r=>r.json()).then(s => {" +
                             "    let box = document.getElementById('statusBox');" +
                             "    if (s.loggedIn) {" +
-                            "      box.innerHTML = `<p>Logged in as <b>@${s.username}</b></p>` +" +
+                            "      box.innerHTML = `<p>Logged in as <b id='lastfmUsername'></b></p>` +" +
                             "        `<button onclick='setEnabled(${!s.enabled})'>Turn Scrobbling ${s.enabled ? 'OFF' : 'ON'}</button>` +" +
                             "        `<p>Scrobbling is currently <b>${s.enabled ? 'ON' : 'OFF'}</b></p>` +" +
                             "        `<button class='danger' onclick='doLogout()'>Log Out</button>`;" +
+                            "      document.getElementById('lastfmUsername').textContent = '@' + s.username;" +
                             "      document.getElementById('loginBox').style.display = 'none';" +
                             "    } else {" +
                             "      box.innerHTML = '<p>Not logged in to Last.fm.</p>';" +
@@ -645,9 +657,13 @@ public class Y1WebServer extends Thread {
                     com.themoon.y1.managers.LastFmScrobbler.getInstance(context).setEnabled(value);
                     writeJson(os, "{\"ok\":true}");
                 }
+                else { os.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\nNot Found".getBytes("UTF-8")); }
                 os.flush();
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                try { socket.getOutputStream().write("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\nRequest failed".getBytes("UTF-8")); } catch (Exception ignored) {}
+            }
             finally {
+                clients.remove(socket);
                 try { socket.close(); } catch (Exception e) {}
             }
         }

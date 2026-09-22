@@ -350,6 +350,13 @@ public class ThemeManager {
         }
         return cachedBoldFont;
     }
+    public static boolean isClassicTheme() {
+        String name = getCurrentTheme().name;
+        return "iPod Classic".equals(name) || "iPod Classic Dark".equals(name);
+    }
+    public static boolean isClassicLightTheme() { return "iPod Classic".equals(getCurrentTheme().name); }
+    public static float getListTextSize() { return isClassicTheme() ? 21f : 23f; }
+
     public static int getTextColorPrimary() { return getCurrentTheme().textPrimary; }
     public static int getTextColorSecondary() { return getCurrentTheme().textSecondary; }
     public static int getOverlayBackgroundColor() { return getCurrentTheme().bgOverlay; }

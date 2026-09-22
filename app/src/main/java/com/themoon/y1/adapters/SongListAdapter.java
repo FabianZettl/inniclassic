@@ -312,7 +312,7 @@ public class SongListAdapter extends BaseAdapter {
             @Override
             public void onFocusChange(android.view.View v, boolean hasFocus) {
                 if (hasFocus) {
-                    btn.setBackground(MainActivity.instance.createButtonBackground(com.themoon.y1.ThemeManager.getListButtonFocusedBg()));
+                    btn.setBackground(MainActivity.instance.createFocusedButtonBackground());
 
                     if (v instanceof android.widget.LinearLayout) {
                         android.widget.LinearLayout row = (android.widget.LinearLayout) v;
@@ -320,6 +320,7 @@ public class SongListAdapter extends BaseAdapter {
                             ((android.widget.TextView) row.getChildAt(0)).setTextColor(com.themoon.y1.ThemeManager.getListButtonFocusedTextColor());
                             android.widget.TextView tvText = (android.widget.TextView) row.getChildAt(1);
                             tvText.setTextColor(com.themoon.y1.ThemeManager.getListButtonFocusedTextColor());
+                            if (row.getChildCount() > 2) row.getChildAt(2).setVisibility(View.VISIBLE);
                             tvText.setSelected(true); // 🚀 텍스트 흐르기 가동!
                         }
                     } else if (v instanceof android.widget.Button) {
@@ -337,6 +338,7 @@ public class SongListAdapter extends BaseAdapter {
                             ((android.widget.TextView) row.getChildAt(0)).setTextColor(normalColor);
                             android.widget.TextView tvText = (android.widget.TextView) row.getChildAt(1);
                             tvText.setTextColor(normalColor);
+                            if (row.getChildCount() > 2) row.getChildAt(2).setVisibility(View.GONE);
                             tvText.setSelected(false); // 🚀 텍스트 흐르기 정지!
                         }
                     } else if (v instanceof android.widget.Button) {
@@ -357,9 +359,7 @@ public class SongListAdapter extends BaseAdapter {
             @Override
             public void run() {
                 // UI가 화면에 완전히 그려진 직후, 포커스를 쥐고 있다면 억지로 한 번 이벤트를 쏴서 깨워줍니다!
-                if (btn.isFocused()) {
-                    listener.onFocusChange(btn, true);
-                }
+                listener.onFocusChange(btn, btn.isFocused());
             }
         });
     }
