@@ -57,8 +57,9 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 - **Audiobooks** — bookmarked, resumable playback
 - **Wireless PC Upload** — a small web server for copying music onto the device over Wi-Fi, no cable needed
 
-### Installable two ways
-- **Flashable ROM** (`rom.zip`) via the [Innioasis Updater](https://www.innioasis.com/pages/download) — no ADB required
+### Installable three ways
+- **[Install from Innioasis Updater CE](https://innioasis.app/inniclassic-y1-software.html)** by selecting Y1 as your Model and Inniclassic as your Software, then click Install and follow the on screen instructions.
+- **Flashable ROM** (`rom.zip`) for Manual flashing via SP Flash Tool / MTK Client (Included with [Updater CE](https://innioasis.app))
 - Standalone **APK** for updating an existing install
 
 ### Under the hood
