@@ -7,6 +7,7 @@ All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are 
 ### Fixed
 - **Theme could silently revert to the default after connecting the device as USB Mass Storage** — the selected theme was persisted only as a numeric index into the SD card's theme folder listing, and that listing's order isn't guaranteed stable across a mount/unmount cycle (common FAT32 behavior). The saved index could end up pointing at a completely different theme once the card was reconnected. The theme's name is now saved alongside the index and resolved by name on startup — independent of scan order — with the old index kept only as a fallback for upgrades.
 - **`.scrobbler.log` declared its timestamps as `#TZ/UNKNOWN`** even though they're genuinely UTC (`System.currentTimeMillis()` is always UTC epoch time, regardless of the device's local timezone setting). Now correctly declared as `#TZ/UTC`, so any tool that imports the log trusts the timestamps instead of asking or guessing. Only affects newly created log files — an existing `.scrobbler.log`'s header isn't rewritten.
+- **On-screen keyboard was missing common punctuation**, making some Wi-Fi passwords (and anything else typed through it — podcast search, Last.fm login, etc.) impossible to enter. Added `; : , / \ ( ) [ ] { } < > ' ~ \`` and `|`.
 
 ## [1.4.4] - 2026-09-29
 
