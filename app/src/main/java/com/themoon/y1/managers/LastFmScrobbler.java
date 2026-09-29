@@ -274,7 +274,10 @@ public class LastFmScrobbler {
             try {
                 if (isNew) {
                     fw.write("#AUDIOSCROBBLER/1.1\n");
-                    fw.write("#TZ/UNKNOWN\n");
+                    // System.currentTimeMillis() is always UTC epoch time regardless of the device's
+                    // local timezone, so the timestamps below genuinely are UTC - declaring UNKNOWN
+                    // here (the old value) made compliant importers ask/guess instead of trusting them.
+                    fw.write("#TZ/UTC\n");
                     fw.write("#CLIENT/JJY 1.0\n");
                 }
                 fw.write(tsv(artist, album, title, "", String.valueOf(durationSec), "L", String.valueOf(timestampSec), ""));

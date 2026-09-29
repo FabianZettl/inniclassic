@@ -1648,8 +1648,17 @@ public class MainActivity extends Activity {
                 int ipodClassicIndex = ThemeManager.findThemeIndexByName("iPod Classic");
                 ThemeManager.setThemeIndex(ipodClassicIndex >= 0 ? ipodClassicIndex : 0);
             } else {
-                int savedThemeIndex = prefs.getInt("app_theme_index", 0);
-                ThemeManager.setThemeIndex(savedThemeIndex);
+                // 🚀 [USB 마스 스토리지 버그 수리] 예전 사용자를 위해 인덱스도 계속 읽지만, 이름 저장값이 있다면
+                // 항상 이름을 우선합니다 - SD카드가 PC에 마운트되었다 빠지면서 폴더 스캔 순서가 바뀌어도
+                // (흔한 FAT32 동작) 저장된 인덱스가 엉뚱한(보통 기본) 테마를 가리키는 문제를 막습니다.
+                String savedThemeName = prefs.getString("app_theme_name", null);
+                int resolvedIndex = savedThemeName != null ? ThemeManager.findThemeIndexByName(savedThemeName) : -1;
+                if (resolvedIndex >= 0) {
+                    ThemeManager.setThemeIndex(resolvedIndex);
+                } else {
+                    int savedThemeIndex = prefs.getInt("app_theme_index", 0);
+                    ThemeManager.setThemeIndex(savedThemeIndex);
+                }
             }
         } catch (Exception e) {
         }
@@ -3615,6 +3624,11 @@ public class MainActivity extends Activity {
                     try {
                         SharedPreferences.Editor editor = prefs.edit();
                         editor.putInt("app_theme_index", index);
+                        // 🚀 [USB 마스 스토리지 버그 수리] 이름도 함께 저장합니다 - 순수 인덱스만 저장하면, SD카드를
+                        // PC에 마운트했다가 뺀 뒤 파일시스템이 폴더 스캔 순서를 다르게 돌려줄 때(흔한 FAT32 동작)
+                        // 저장된 인덱스가 완전히 다른 테마를 가리키게 되어 "갑자기 기본 테마로 돌아갔다"는 증상이
+                        // 나왔습니다. 다음 시작 시 이름으로 다시 찾으면 순서가 바뀌어도 항상 정확한 테마를 찾습니다.
+                        editor.putString("app_theme_name", ThemeManager.availableThemes.get(index).name);
                         editor.putBoolean("reboot_to_theme", true);
 
                         // 🚀 [지능형 룰 1] 새로 선택한 테마에 고유 배경화면이 있는지 3중으로 검사합니다.
