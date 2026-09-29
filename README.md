@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/Device-Innioasis%20Y1%20only-blue?style=flat-square" alt="Device">
   <img src="https://img.shields.io/badge/Status-Beta-Orange?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/Version-1.4.3-informational?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.4.4-informational?style=flat-square" alt="Version">
   <a href="https://buymeacoffee.com/gz17egcara"><img src="https://img.shields.io/badge/Buy%20me%20a-coffee-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
@@ -35,8 +35,10 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 - Bundled **iPod Classic** theme (light + dark variant), aiming for a 1:1 look: plain-text menu lists, real system-matched bold typography, tight iPod-accurate spacing, and a status bar that shows the current screen's name instead of a clock
 - Two-pane Main Menu and Music menu, both sharing the exact same look and behavior: menu list on the left, a slowly panning ("Ken Burns") album cover on the right that bleeds all the way to the top of the screen, behind the status bar
 - Redesigned **Now Playing** screen — large angled album cover with a reflection underneath (toggleable via **Album Cover Tilt**), a glass-look progress/volume bar, and a scrolling marquee for titles too long to fit
-- Center-click on Now Playing cycles **Progress → Seek → Shuffle & Repeat → Rating**, exactly like a real iPod Classic (the wheel scrubs, cycles shuffle/repeat, or sets a star rating depending on the state; volume control otherwise)
-- **On-The-Go playlist** and a **Now Playing hold-menu** (long-press Center): Add to On-The-Go, Rate Song, Browse Album, Browse Artist, Toggle Visualizer
+- Center-click on Now Playing cycles **Progress → Seek → Shuffle & Repeat → Rating**, inspired by the iPod Classic (the wheel previews a seek position in 5-second steps, cycles shuffle/repeat, or sets a star rating depending on the state; volume control otherwise)
+- **Confirm seeking** — in Seek mode, turn the wheel to choose a position, then press Center to apply it and return to Progress. Without turning the wheel, Center continues through the other display modes.
+- **Key lock** — hold Center for 0.8 seconds to lock; hold Center again to unlock. A short Center press selects items or cycles Now Playing modes.
+- **On-The-Go playlist** and a **Now Playing hold-menu** (long-press Play/Pause): Add/Remove Favorite, Add to On-The-Go, Browse Album, Browse Artist, Toggle Visualizer (song rating is set from the bottom-bar Rating mode instead — see above)
 - **Synced lyrics** — "Toggle Visualizer" swaps the spectrum analyzer for a scrolling, time-synced lyrics view whenever lyrics are found for the current track: an external `.lrc` file next to the song (same filename), or embedded lyrics (ID3 `USLT` for MP3, FLAC/ALAC tags) — synced if they contain `[mm:ss.xx]` timestamps, otherwise shown as plain scrolling text
 - **Favorites** with a heart indicator on Now Playing (hollow when not favorited, filled red when it is)
 - Fast-scroll letter jump on every alphabetized list, like spinning a real click wheel
@@ -53,7 +55,7 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 ### Beyond music
 - **Podcasts** — subscribe, stream, download for offline listening
 - **FM Radio** — talks to the real hardware tuner directly, no need for the stock radio app
-- **Video playback** — a dedicated Videos folder on the SD card, full-screen playback with wheel-driven volume/seek, powered by libVLC for stable, correctly-synced playback. The Videos list shows a real thumbnail per file, playback remembers where you left off, and **Settings → Fill Video Screen** lets you choose between preserving the original aspect ratio (letterboxed) or filling the whole screen (see [Known limitations](#known-limitations))
+- **Video playback** — a dedicated Videos folder on the SD card, full-screen playback with wheel-driven volume and Previous/Next seeking (10 seconds), powered by libVLC for stable, correctly-synced playback. The Videos list shows a real thumbnail per file, playback remembers where you left off, and **Settings → Fill Video Screen** lets you choose between preserving the original aspect ratio (letterboxed) or filling the whole screen (see [Known limitations](#known-limitations))
 - **Audiobooks** — bookmarked, resumable playback
 - **Wireless PC Upload** — a small web server for copying music onto the device over Wi-Fi, no cable needed
 

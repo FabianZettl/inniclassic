@@ -346,23 +346,23 @@
 
         <!-- 🚀 [수정] 진행바를 화면 맨 아래로, 좌우 여백을 줘서 조금 짧게, 더 두껍게. 시간 글씨는 굵고 크게! -->
         <LinearLayout android:id="@+id/row_player_progress" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="26dp" android:paddingRight="26dp" android:paddingBottom="14dp">
-            <TextView android:id="@+id/tv_player_time_current" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginRight="10dp"/>
-            <ProgressBar android:id="@+id/player_progress" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_now_playing" android:layout_width="0dp" android:layout_height="26dp" android:layout_weight="1" android:max="100" android:progress="0"/>
-            <TextView android:id="@+id/tv_player_time_total" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginLeft="10dp"/>
+            <TextView android:id="@+id/tv_player_time_current" android:layout_width="54dp" android:layout_height="wrap_content" android:text="0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginRight="10dp"/>
+            <ProgressBar android:id="@+id/player_progress" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_now_playing" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:max="100" android:progress="0"/>
+            <TextView android:id="@+id/tv_player_time_total" android:layout_width="54dp" android:layout_height="wrap_content" android:text="-0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginLeft="10dp"/>
         </LinearLayout>
 
         <!-- 🚀 [iPod 스타일] 볼륨 조절 시 Progress 바와 똑같은 모양으로 일시적으로 겹쳐 보여주는 인라인 볼륨 게이지 -->
         <LinearLayout android:id="@+id/row_player_volume" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="26dp" android:paddingRight="26dp" android:paddingBottom="14dp" android:visibility="gone">
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔈" android:textSize="14sp" android:layout_marginRight="10dp"/>
-            <ProgressBar android:id="@+id/player_volume_progress" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_now_playing" android:layout_width="0dp" android:layout_height="26dp" android:layout_weight="1" android:max="100" android:progress="0"/>
+            <ProgressBar android:id="@+id/player_volume_progress" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_now_playing" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:max="100" android:progress="0"/>
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔊" android:textSize="14sp" android:layout_marginLeft="10dp"/>
         </LinearLayout>
 
         <!-- 🚀 [iPod 스타일] Center 클릭으로 순환되는 2번째 상태: Seek(탐색) 바, 다이아몬드 손잡이를 휠로 움직여 곡 위치 점프 -->
         <LinearLayout android:id="@+id/row_player_seek" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="26dp" android:paddingRight="26dp" android:paddingBottom="14dp" android:visibility="gone">
-            <TextView android:id="@+id/tv_player_seek_current" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginRight="10dp"/>
-            <SeekBar android:id="@+id/seek_player_scrub" android:layout_width="0dp" android:layout_height="26dp" android:layout_weight="1" android:max="1000" android:progress="0" android:progressDrawable="@drawable/progress_bar_now_playing" android:thumb="@drawable/seek_diamond_thumb" android:splitTrack="false" android:focusable="false" android:clickable="false"/>
-            <TextView android:id="@+id/tv_player_seek_total" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginLeft="10dp"/>
+            <TextView android:id="@+id/tv_player_seek_current" android:layout_width="54dp" android:layout_height="wrap_content" android:text="0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginRight="10dp"/>
+            <SeekBar android:id="@+id/seek_player_scrub" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:max="1000" android:progress="0" android:progressDrawable="@drawable/progress_bar_now_playing" android:thumb="@drawable/seek_diamond_thumb" android:splitTrack="false" android:focusable="false" android:clickable="false"/>
+            <TextView android:id="@+id/tv_player_seek_total" android:layout_width="54dp" android:layout_height="wrap_content" android:text="-0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginLeft="10dp"/>
         </LinearLayout>
 
         <!-- 🚀 [iPod 스타일] 3번째 상태: Shuffle & Repeat 빠른 전환 위젯 -->
@@ -379,11 +379,11 @@
 
         <!-- 🚀 [iPod 스타일] 4번째 상태: 별점 매기기 (휠로 조절) -->
         <LinearLayout android:id="@+id/row_player_rating_scrub" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center" android:paddingBottom="18dp" android:visibility="gone">
-            <TextView android:id="@+id/tv_scrub_star_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="☆" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
-            <TextView android:id="@+id/tv_scrub_star_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="☆" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
-            <TextView android:id="@+id/tv_scrub_star_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="☆" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
-            <TextView android:id="@+id/tv_scrub_star_4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="☆" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
-            <TextView android:id="@+id/tv_scrub_star_5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="☆" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
+            <TextView android:id="@+id/tv_scrub_star_1" android:layout_width="32dp" android:gravity="center" android:layout_height="wrap_content" android:text="•" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
+            <TextView android:id="@+id/tv_scrub_star_2" android:layout_width="32dp" android:gravity="center" android:layout_height="wrap_content" android:text="•" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
+            <TextView android:id="@+id/tv_scrub_star_3" android:layout_width="32dp" android:gravity="center" android:layout_height="wrap_content" android:text="•" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
+            <TextView android:id="@+id/tv_scrub_star_4" android:layout_width="32dp" android:gravity="center" android:layout_height="wrap_content" android:text="•" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
+            <TextView android:id="@+id/tv_scrub_star_5" android:layout_width="32dp" android:gravity="center" android:layout_height="wrap_content" android:text="•" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
         </LinearLayout>
     </FrameLayout>
 

@@ -2,6 +2,29 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.4.4] - 2026-09-29
+
+A hardware-input overhaul: a real Hold/lock switch, a proper video/music handoff, and a round of Now Playing and Videos polish.
+
+### Added
+- **Hold (key lock)** — hold Center for 0.8s to lock the wheel/buttons (and physically turn the display off); hold Center again to unlock. This is the real fix for "screen wakes up randomly in my pocket": instead of trying to guess which button presses are accidental, you can now lock input entirely, matching the real iPod Classic's Hold switch.
+- **Toggle Favorite is back in the Now Playing hold-menu** (long-press Play/Pause) — the redesigned Center gesture handling below removed the old "double-click Center" favorite shortcut without anywhere else to reach it, so this restores it in a sensible new spot before release.
+
+### Fixed
+- **Video Play/Pause was starting music instead of pausing the video.** Two compounding bugs: (1) the physical Play/Pause button is delivered both through the app's normal input path *and* independently through a registered hardware media-button receiver, and only the first one knew about video — with "Screen Off Control" enabled in Settings, the receiver would call the music player regardless of what was on screen; (2) opening a video didn't stop any music that was already playing. Both are fixed: the media-button receiver now ignores playback keys entirely while a video is open, and opening a video now pauses active music first.
+- **Videos list ignored the wheel/Center** in some cases — the screen was unconditionally swallowing every key before the shared list-navigation code could see it.
+- **Now Playing wheel seeking** now behaves as a real preview-then-confirm: turning the wheel in Seek mode moves a pending position in 5-second steps without touching actual playback, and only applies it once you press Center again (otherwise Center just continues cycling Progress → Seek → Shuffle & Repeat → Rating). The preview no longer gets silently overwritten by the normal progress-bar update ticking in the background.
+- Center-button handling is now centralized in one place instead of being spread across multiple key handlers — fixes a hold sometimes also registering as a select, and holding Center no longer incorrectly opens the song menu or toggles video seek mode (that's long Play/Pause and short Center respectively now).
+- Pausing on the Classic theme no longer dims the album artwork or leaves a leftover audio-format overlay on screen; whichever Now Playing bottom-bar mode you were in survives a pause/resume instead of resetting.
+- Removed a duplicate progress-callback registration that caused Now Playing's timers to accumulate extra callbacks the longer a session ran.
+
+### Changed
+- More compact Now Playing progress/volume bars, fixed-width time labels, and evenly spaced rating marks.
+- Video playback now seeks via the Previous/Next buttons (±10s); the wheel is volume-only during video (its old long-press-to-toggle-seek-mode gesture no longer has a way to trigger it now that long-press Center is reserved for Hold, so this is the new way to seek).
+- Classic Videos list now shares the same background/row styling as every other list instead of its own slightly different look.
+
+Full engineering write-up: [`docs/release-review-1.4.4.md`](docs/release-review-1.4.4.md).
+
 ## [1.4.3] - 2026-09-22
 
 A theme-consistency pass plus a round of real correctness/security fixes underneath, including a Last.fm crash and a Wireless PC Upload path-traversal issue.
