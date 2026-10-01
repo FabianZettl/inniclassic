@@ -4,6 +4,10 @@ import android.content.Context;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import java.lang.reflect.Method;
+import java.nio.charset.Charset;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class FmRadioManager {
     private static FmRadioManager instance;
@@ -17,11 +21,31 @@ public class FmRadioManager {
 
     public String lastError = "";
 
+    private boolean extendedInfoEnabled;
+    private ScheduledExecutorService rdsReader;
+    private boolean rdsEnabled;
+    private long rdsSession;
+    private String stationName = "";
+    private String radioText = "";
+    private String metadataStatus = "";
+
     private Class<?> fmNativeClass;
     private MediaPlayer fmPlayer; // 🚀 [핵심] 소리를 스피커로 빼내 줄 미디어 플레이어
 
     private FmRadioManager(Context context) {
         this.context = context.getApplicationContext();
+        android.content.SharedPreferences prefs = this.context.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE);
+        // Preserve effective selections from the first local test build.
+        if (prefs.contains("radio_extended_info")) {
+            boolean previouslyEnabled = prefs.getBoolean("radio_extended_info", false);
+            prefs.edit().putBoolean("radio_show_station_name", previouslyEnabled
+                    && prefs.getBoolean("radio_show_station_name", true))
+                    .putBoolean("radio_show_radio_text", previouslyEnabled
+                    && prefs.getBoolean("radio_show_radio_text", true))
+                    .remove("radio_extended_info").apply();
+        }
+        extendedInfoEnabled = prefs.getBoolean("radio_show_station_name", false)
+                || prefs.getBoolean("radio_show_radio_text", false);
         this.audioManager = (AudioManager) this.context.getSystemService(Context.AUDIO_SERVICE);
 
         try {
@@ -118,11 +142,12 @@ public class FmRadioManager {
     }
 
     // 1. 하드웨어 전원 켜기
-    public boolean powerUp(float freq) {
+    public synchronized boolean powerUp(float freq) {
         if (fmNativeClass == null) {
             if (lastError.isEmpty()) lastError = "Driver class is null.";
             return false;
         }
+        stopRds();
         try {
             // 🚀 1. 백그라운드에 숨어있는 순정 라디오 앱들을 모두 확실하게 사살하여 점유를 해제합니다.
             Runtime.getRuntime().exec(new String[]{"su", "-c", "killall com.mediatek.FMRadio"});
@@ -177,6 +202,7 @@ public class FmRadioManager {
                     lastError = "Earphones required and Antenna bypass failed.";
                 }
             }
+            if (isPowerUp) startRds();
             return isPowerUp;
         } catch (Throwable t) {
             lastError = "Exception: " + t.getClass().getSimpleName() + " - " + t.getMessage();
@@ -184,7 +210,8 @@ public class FmRadioManager {
         return false;
     }
     // 2. 하드웨어 전원 끄기
-    public void powerDown() {
+    public synchronized void powerDown() {
+        stopRds();
         if (fmNativeClass == null || !isPowerUp) return;
         try {
             stopFmAudio(); // 🚀 전원 끌 때 소리 통로도 같이 뽑아줍니다!
@@ -201,22 +228,25 @@ public class FmRadioManager {
     }
 
     // 3. 주파수 수동 맞추기 (Manual Tuning)
-    public boolean tune(float freq) {
+    public synchronized boolean tune(float freq) {
         if (fmNativeClass == null || !isPowerUp) return false;
+        stopRds();
         try {
             Method tuneMethod = getNativeMethod("tune", float.class);
             boolean success = (Boolean) tuneMethod.invoke(null, freq);
             if (success) currentFreq = freq;
             return success;
         } catch (Throwable e) { return false; }
+        finally { startRds(); }
     }
 
     // 🚀 4. 자동 스캔 엔진 (Auto Scan)
-    public float[] autoScan() {
+    public synchronized float[] autoScan() {
         if (fmNativeClass == null || !isPowerUp) {
             lastError = "Turn on the radio first.";
             return null;
         }
+        stopRds();
         try {
             Method autoScanMethod = getNativeMethod("autoscan");
             short[] result = (short[]) autoScanMethod.invoke(null);
@@ -230,8 +260,102 @@ public class FmRadioManager {
             }
         } catch (Throwable t) {
             lastError = "AutoScan failed: " + t.getMessage();
-        }
+        } finally { startRds(); }
         return null;
+    }
+
+    public synchronized boolean isExtendedInfoEnabled() {
+        return extendedInfoEnabled;
+    }
+
+    public synchronized void setInfoFields(boolean stationNameEnabled, boolean radioTextEnabled) {
+        extendedInfoEnabled = stationNameEnabled || radioTextEnabled;
+        context.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE).edit()
+                .putBoolean("radio_show_station_name", stationNameEnabled)
+                .putBoolean("radio_show_radio_text", radioTextEnabled).apply();
+        stopRds();
+        startRds();
+    }
+
+    public synchronized String getExtendedInfoText() {
+        return getExtendedInfoText(true, true);
+    }
+
+    public synchronized String getExtendedInfoText(boolean showStationName, boolean showRadioText) {
+        if (!extendedInfoEnabled || !isPowerUp) return "";
+        if (!showStationName && !showRadioText) return "";
+        String name = showStationName ? stationName : "";
+        String text = showRadioText ? radioText : "";
+        if (name.isEmpty() && text.isEmpty()) return metadataStatus;
+        return name + (name.isEmpty() || text.isEmpty() ? "" : "\n") + text;
+    }
+
+    private void startRds() {
+        if (!extendedInfoEnabled || !isPowerUp || rdsReader != null) return;
+        try {
+            if (((Number) getNativeMethod("isRDSsupport").invoke(null)).intValue() != 1) {
+                metadataStatus = "RDS unavailable";
+                return;
+            }
+            // Resolve optional accessors before enabling the hardware feature.
+            final Method read = getNativeMethod("readrds");
+            final Method ps = getNativeMethod("getPS");
+            final Method rt = getNativeMethod("getLRText");
+            rdsEnabled = true;
+            // Y1 JNI translates the driver's zero success code to 1.
+            if (((Number) getNativeMethod("rdsset", boolean.class).invoke(null, true)).intValue() != 1) {
+                stopRds();
+                metadataStatus = "RDS unavailable";
+                return;
+            }
+            metadataStatus = "Waiting for station information…";
+            final long session = ++rdsSession;
+            rdsReader = Executors.newSingleThreadScheduledExecutor();
+            rdsReader.scheduleWithFixedDelay(() -> {
+                synchronized (FmRadioManager.this) {
+                    if (session != rdsSession || !rdsEnabled) return;
+                    try {
+                        // The Y1 driver returns immediately when no RDS event is available.
+                        // Serialize reads with tuning/closing: JNI maintains a shared RDS buffer.
+                        int events = ((Number) read.invoke(null)).intValue() & 0xffff;
+                        if ((events & 0x0008) != 0) stationName = decodeRdsText((byte[]) ps.invoke(null));
+                        if ((events & 0x0040) != 0) radioText = decodeRdsText((byte[]) rt.invoke(null));
+                    } catch (Throwable error) {
+                        stopRds();
+                        metadataStatus = "RDS unavailable";
+                    }
+                }
+            }, 0, 500, TimeUnit.MILLISECONDS);
+        } catch (Throwable error) {
+            stopRds();
+            metadataStatus = "RDS unavailable";
+        }
+    }
+
+    private void stopRds() {
+        ++rdsSession;
+        if (rdsReader != null) {
+            rdsReader.shutdownNow();
+            rdsReader = null;
+        }
+        if (rdsEnabled) {
+            try { getNativeMethod("rdsset", boolean.class).invoke(null, false); }
+            catch (Throwable ignored) { }
+            rdsEnabled = false;
+        }
+        stationName = "";
+        radioText = "";
+        metadataStatus = "";
+    }
+
+    static String decodeRdsText(byte[] bytes) {
+        if (bytes == null) return "";
+        int end = 0;
+        while (end < bytes.length && bytes[end] != 0 && bytes[end] != 13) end++;
+        // Preserve basic Latin text; do not misdecode RDS extended characters as UTF-8.
+        // Full RDS character-table conversion can follow after capturing Y1 samples.
+        String text = new String(bytes, 0, end, Charset.forName("US-ASCII"));
+        return text.replaceAll("[\\p{Cntrl}]", " ").trim();
     }
 
     // 5. 음소거 제어

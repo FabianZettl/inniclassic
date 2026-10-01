@@ -6579,9 +6579,46 @@ public class MainActivity extends Activity {
             containerSettingsItems.getChildAt(0).requestFocus();
     }
 
+    private boolean isRadioInfoSettingsMode;
+
+    private void buildRadioInfoSettingsUI() {
+        Button close = createListButton(t("Close Settings"));
+        close.setOnClickListener(v -> {
+            clickFeedback();
+            isRadioInfoSettingsMode = false;
+            buildRadioUI();
+        });
+        containerSettingsItems.addView(close);
+        addRadioInfoToggle("Station Name", "radio_show_station_name");
+        addRadioInfoToggle("Radio Text", "radio_show_radio_text");
+        close.requestFocus();
+    }
+
+    private void addRadioInfoToggle(String title, String key) {
+        boolean enabled = prefs.getBoolean(key, false);
+        LinearLayout row = createSettingRow(title, enabled ? t("ON") : t("OFF"));
+        row.setOnLongClickListener(globalScreenOffLongClickListener);
+        row.setOnClickListener(v -> {
+            clickFeedback();
+            prefs.edit().putBoolean(key, !enabled).apply();
+            com.themoon.y1.managers.FmRadioManager.getInstance(this).setInfoFields(
+                    prefs.getBoolean("radio_show_station_name", false),
+                    prefs.getBoolean("radio_show_radio_text", false));
+            buildRadioUI();
+            containerSettingsItems.getChildAt(key.equals("radio_show_station_name") ? 1 : 2).requestFocus();
+        });
+        containerSettingsItems.addView(row);
+    }
+
+    private String getRadioInfoText(com.themoon.y1.managers.FmRadioManager fm) {
+        return fm.getExtendedInfoText(prefs.getBoolean("radio_show_station_name", false),
+                prefs.getBoolean("radio_show_radio_text", false));
+    }
+
     private void buildRadioUI() {
         currentSettingsDepth = 1;
         isRadioUIShowing = true; // 🚀 내가 지금 라디오 화면에 있다는 걸 시스템에 알림!
+        radioInfoHandler.removeCallbacks(updateRadioInfoTask);
         containerSettingsItems.removeAllViews();
 
         // 🚀 상단 "Settings" 유령 타이틀 원천 차단 숨김 처리
@@ -6603,6 +6640,11 @@ public class MainActivity extends Activity {
                 }
             } catch (Exception e) {
             }
+        }
+
+        if (isRadioInfoSettingsMode && isRadioSettingsMode) {
+            buildRadioInfoSettingsUI();
+            return;
         }
 
         final float density = getResources().getDisplayMetrics().density;
@@ -6640,13 +6682,29 @@ public class MainActivity extends Activity {
             tvFreq.setTag("radio_main_freq_text");
             tvFreq.setText(String.format(Locale.US, "%.1f MHz", fmManager.currentFreq));
             tvFreq.setTextColor(fmManager.isPowerUp ? themeHighlightColor : 0xFF888888);
-            tvFreq.setTextSize(54);
+            tvFreq.setTextSize(fmManager.isExtendedInfoEnabled() ? 42 : 54);
             tvFreq.setGravity(Gravity.CENTER);
             tvFreq.setTypeface(ThemeManager.getCustomFontBold());
-            tvFreq.setPadding(0, (int) (38 * density), 0, (int) (38 * density));
+            int frequencyPadding = (int) ((fmManager.isExtendedInfoEnabled() ? 20 : 38) * density);
+            tvFreq.setPadding(0, frequencyPadding, 0, frequencyPadding);
 
             freqPanel.addView(tvFreq);
             containerSettingsItems.addView(freqPanel);
+
+            if (fmManager.isExtendedInfoEnabled()) {
+                TextView info = new TextView(this);
+                info.setTag("radio_extended_info_text");
+                info.setText(getRadioInfoText(fmManager));
+                info.setTextColor(ThemeManager.getTextColorSecondary());
+                info.setTypeface(ThemeManager.getCustomFontBold());
+                info.setTextSize(18);
+                info.setGravity(Gravity.CENTER);
+                info.setMaxLines(3);
+                info.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                info.setPadding((int) (15 * density), 0, (int) (15 * density), (int) (8 * density));
+                containerSettingsItems.addView(info);
+                radioInfoHandler.postDelayed(updateRadioInfoTask, 1000);
+            }
 
             // 🍬 가로 스크롤형 알약 채널 컨테이너
             if (!savedRadioStations.isEmpty()) {
@@ -6956,6 +7014,16 @@ public class MainActivity extends Activity {
                 buildRadioUI();
             });
             containerSettingsItems.addView(btnSpeaker);
+
+            LinearLayout btnExtendedInfo = createSettingRow("Extended Information", t("Configure") + " 〉");
+            btnExtendedInfo.setOnLongClickListener(globalScreenOffLongClickListener);
+            btnExtendedInfo.setOnClickListener(v -> {
+                clickFeedback();
+                isRadioAdjustingFreq = false;
+                isRadioInfoSettingsMode = true;
+                buildRadioUI();
+            });
+            containerSettingsItems.addView(btnExtendedInfo);
 
             containerSettingsItems.postDelayed(() -> {
                 int targetIdx = lastRadioFocusIndex;
@@ -12384,6 +12452,11 @@ public class MainActivity extends Activity {
                         return true;
                     }
                     // 🚀 [1단계] 라디오 설정 서브 페이지 모드라면, 라디오 메인 플레이어 모드로 먼저 탈출!
+                    if (isRadioUIShowing && isRadioSettingsMode && isRadioInfoSettingsMode) {
+                        isRadioInfoSettingsMode = false;
+                        buildRadioUI();
+                        return true;
+                    }
                     if (isRadioUIShowing && isRadioSettingsMode) {
                         isRadioSettingsMode = false;
                         isRadioAdjustingFreq = false;
@@ -13247,6 +13320,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        radioInfoHandler.removeCallbacks(updateRadioInfoTask);
         centerGestureHandler.removeCallbacksAndMessages(null);
         if (webServer != null) webServer.stopServer();
         clockHandler.removeCallbacks(clockTask);
@@ -15734,6 +15808,18 @@ public class MainActivity extends Activity {
     }
 
     // 🚀 [신규 엔진] 휠 조작 주파수 실시간 전체 화면 팝업 제어기
+    private final Handler radioInfoHandler = new Handler();
+    private final Runnable updateRadioInfoTask = new Runnable() {
+        @Override public void run() {
+            if (!isRadioUIShowing || isRadioSettingsMode || currentScreenState != STATE_SETTINGS
+                    || containerSettingsItems == null) return;
+            TextView info = containerSettingsItems.findViewWithTag("radio_extended_info_text");
+            if (info == null) return;
+            info.setText(getRadioInfoText(com.themoon.y1.managers.FmRadioManager.getInstance(MainActivity.this)));
+            radioInfoHandler.postDelayed(this, 1000);
+        }
+    };
+
     private Handler radioFreqHandler = new Handler();
     private Runnable hideRadioFreqTask = new Runnable() {
         @Override
