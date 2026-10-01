@@ -50,6 +50,9 @@ android {
             signingConfig signingConfigs.release
         }
     }
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -58,6 +61,7 @@ android {
 
 dependencies {
     testImplementation libs.junit
+    testImplementation 'org.robolectric:robolectric:4.14.1'
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
     implementation 'com.google.android.exoplayer:exoplayer-core:2.13.3'
