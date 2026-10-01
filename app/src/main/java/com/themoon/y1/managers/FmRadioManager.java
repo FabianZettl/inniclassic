@@ -3,6 +3,7 @@ package com.themoon.y1.managers;
 import android.content.Context;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.os.PowerManager;
 import java.lang.reflect.Method;
 
 public class FmRadioManager {
@@ -84,9 +85,13 @@ public class FmRadioManager {
     private void startFmAudio() {
         try {
             if (fmPlayer != null) {
-                fmPlayer.release();
+                stopFmAudio();
             }
             fmPlayer = new MediaPlayer();
+            // Virtual sleep only covers the app timer. Android display timeout can
+            // still suspend the CPU; keep FM alive without keeping the display on.
+            // MediaPlayer acquires this lock on start and releases it on stop/release.
+            fmPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK);
             // 💡 미디어텍 전용 숨겨진 FM 라디오 오디오 스트림 주소
             fmPlayer.setDataSource("MEDIATEK://MEDIAPLAYER_PLAYERTYPE_FM");
 
@@ -102,6 +107,7 @@ public class FmRadioManager {
             setSpeaker(isSpeakerOn);
 
         } catch (Throwable t) {
+            stopFmAudio();
             lastError = "Audio Routing Failed: " + t.getMessage();
         }
     }
@@ -111,9 +117,12 @@ public class FmRadioManager {
         if (fmPlayer != null) {
             try {
                 if (fmPlayer.isPlaying()) fmPlayer.stop();
-                fmPlayer.release();
-            } catch (Throwable t) {}
-            fmPlayer = null;
+            } catch (Throwable t) {
+            } finally {
+                // Release even if the vendor player throws from isPlaying/stop.
+                try { fmPlayer.release(); } catch (Throwable t) {}
+                fmPlayer = null;
+            }
         }
     }
 
