@@ -60,7 +60,7 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 - **Wireless PC Upload** — a small web server for copying music onto the device over Wi-Fi, no cable needed
 
 ### Installable two ways
-- **Flashable ROM** (`rom.zip`) via the [Innioasis Updater](https://www.innioasis.com/pages/download) — no ADB required
+- **Flashable ROM** (`rom.zip`) via the [Innioasis Updater](https://www.innioasis.app/guide.html) — no ADB required
 - Standalone **APK** for updating an existing install
 
 ### Under the hood
