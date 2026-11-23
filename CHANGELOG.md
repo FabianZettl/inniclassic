@@ -2,6 +2,11 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.5.1] - 2026-11-23
+
+### Fixed
+- **Theme fell back to Dark after a restart or shutdown (#19):** if the SD card was not mounted yet when the app started, the saved theme was not found. The app now keeps retrying for about 30 seconds and switches back to the saved theme as soon as the theme folder is there.
+
 ## [1.5.0] - 2026-11-23
 
 ### Added

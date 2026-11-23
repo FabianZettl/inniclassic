@@ -1671,6 +1671,9 @@ public class MainActivity extends Activity {
                     int savedThemeIndex = prefs.getInt("app_theme_index", 0);
                     ThemeManager.setThemeIndex(savedThemeIndex);
                 }
+                // The saved theme is not there (e.g. the SD card is not mounted yet right after boot):
+                // keep trying for a while, then reload so the saved theme comes back instead of the default.
+                if (savedThemeName != null && resolvedIndex < 0) scheduleThemeRetry(savedThemeName, 0);
             }
         } catch (Exception e) {
         }
@@ -5852,6 +5855,25 @@ public class MainActivity extends Activity {
             if (part.trim().equals(artist)) return true;
         }
         return false;
+    }
+
+    private void scheduleThemeRetry(final String wanted, final int attempt) {
+        if (attempt >= 10) return;
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (isFinishing()) return;
+                File dir = new File("/storage/sdcard0/Y1_Themes");
+                String[] entries = dir.list();
+                if (entries == null || entries.length == 0) {
+                    installBundledThemes(); // storage may be up now, with the folder still empty
+                    scheduleThemeRetry(wanted, attempt + 1);
+                    return;
+                }
+                ThemeManager.loadThemesFromStorage(dir);
+                if (ThemeManager.findThemeIndexByName(wanted) >= 0) recreate(); // onCreate resolves it by name
+            }
+        }, 3000);
     }
 
     private void showPowerOffDialog() {
