@@ -190,14 +190,14 @@ public class MainActivity extends Activity {
                     if (ivStatusPlay != null) {
                         if (fm.isPowerUp || am.isPlaying()) {
                             ivStatusPlay.setVisibility(View.VISIBLE);
-                            ivStatusPlay.setImageResource(android.R.drawable.ic_media_play);
+                            ivStatusPlay.setImageDrawable(new com.themoon.y1.views.StatusPlayDrawable(false));
                         } else {
                             // 둘 다 꺼져있을 때
                             if (currentPlaylist.isEmpty() && activePlayer == 0) {
                                 ivStatusPlay.setVisibility(View.GONE);
                             } else {
                                 ivStatusPlay.setVisibility(View.VISIBLE);
-                                ivStatusPlay.setImageResource(android.R.drawable.ic_media_pause);
+                                ivStatusPlay.setImageDrawable(new com.themoon.y1.views.StatusPlayDrawable(true));
                             }
                         }
                     }
@@ -504,8 +504,9 @@ public class MainActivity extends Activity {
     private SeekBar seekPlayerScrub;
     private TextView tvScrubShuffleValue, tvScrubRepeatValue;
     private TextView[] tvScrubStars;
-    private ProgressBar volumeProgress, pbBrightness, pbStorage;
-    private TextView tvBrightnessVal, tvStorageDetails;
+    private ProgressBar volumeProgress, pbBrightness;
+    private TextView tvBrightnessVal, tvStorageHeader;
+    private LinearLayout containerStorageItems;
     // 💡 [수정] 수동 APP_VERSION 변수는 지우고 서버 폴더 주소만 적습니다.
     public boolean is24HourFormat = false;
     public boolean isTimeInTitleBar = false;
@@ -586,6 +587,7 @@ public class MainActivity extends Activity {
     private long lastScreenOnTime = 0;
     // 💡 [추가] 커스텀 배터리 뷰 변수
     private BatteryIconView batteryIconView;
+    private com.themoon.y1.views.LowBatteryOverlay lowBatteryOverlay;
     private int currentTimeoutIndex = 1;
     private final int[] TIMEOUT_VALUES = { 15000, 30000, 60000, 300000 };
     private final String[] TIMEOUT_NAMES = { "15 Sec", "30 Sec", "1 Min", "5 Min" };
@@ -1052,6 +1054,9 @@ public class MainActivity extends Activity {
                 if (batteryIconView != null) {
                     batteryIconView.setBatteryLevel(batteryPct, isCharging);
                 }
+                if (lowBatteryOverlay == null && findViewById(android.R.id.content) != null)
+                    lowBatteryOverlay = new com.themoon.y1.views.LowBatteryOverlay(MainActivity.this);
+                if (lowBatteryOverlay != null) lowBatteryOverlay.onBattery(batteryPct, isCharging);
                 if (widgetBatteryView != null) {
                     widgetBatteryView.setBatteryLevel(batteryPct, isCharging);
                 }
@@ -1934,8 +1939,8 @@ public class MainActivity extends Activity {
         tvBrightnessVal = findViewById(R.id.tv_brightness_val);
 
         layoutStorageMode = findViewById(R.id.layout_storage_mode);
-        pbStorage = findViewById(R.id.pb_storage);
-        tvStorageDetails = findViewById(R.id.tv_storage_details);
+        tvStorageHeader = findViewById(R.id.tv_storage_header);
+        containerStorageItems = findViewById(R.id.container_storage_items);
 
         layoutWebServerMode = findViewById(R.id.layout_webserver_mode);
         tvServerStatus = findViewById(R.id.tv_server_status);
@@ -2063,7 +2068,7 @@ public class MainActivity extends Activity {
         ivStatusHeadphone = findViewById(R.id.iv_status_headphone);
         // 🚀🚀🚀 [수정 완료] 재생 아이콘을 시계 쪽이 아닌, 우측 시스템 아이콘 그룹에 합류시킵니다! 🚀🚀🚀
         ivStatusPlay = new ImageView(this);
-        ivStatusPlay.setImageResource(android.R.drawable.ic_media_play);
+        ivStatusPlay.setImageDrawable(new com.themoon.y1.views.StatusPlayDrawable(false));
         ivStatusPlay.setColorFilter(0xFF6194D1);
         ivStatusPlay.setVisibility(View.GONE);
 
@@ -3615,13 +3620,8 @@ public class MainActivity extends Activity {
             final int index = i;
             ThemeManager.ThemeData theme = ThemeManager.availableThemes.get(i);
 
-            String prefix = (ThemeManager.getCurrentThemeIndex() == i) ? "✔ " : "   ";
-            Button btn = createListButton(prefix + theme.name);
-
-            if (ThemeManager.getCurrentThemeIndex() == i) {
-                btn.setTypeface(ThemeManager.getCustomFontBold());
-                btn.setTextColor(0xFF00FF00); // 현재 사용 중인 테마는 초록색으로 굵게 강조!
-            }
+            Button btn = createListButton(theme.name);
+            com.themoon.y1.views.ListMarks.markChosen(btn, ThemeManager.getCurrentThemeIndex() == i);
 
             btn.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -4843,75 +4843,55 @@ public class MainActivity extends Activity {
         }
     }
 
-    // 💡 [수정] 기존 막대바를 숨기고 우리가 만든 원형 차트를 동적으로 띄워주는 로직
-    // 💡 [수정] 스토리지 상세 정보 텍스트 적용
-    // 💡 [완벽 수정] 스토리지 용량 계산 에러(오버플로우) 방지 및 진짜 테마 색상 적용
+    private String formatStorageSize(long bytes) {
+        double gb = bytes / (1024.0 * 1024.0 * 1024.0);
+        if (gb >= 1.0) return String.format(java.util.Locale.US, "%.1f GB", gb);
+        return (bytes / (1024 * 1024)) + " MB";
+    }
+
+    private void addAboutRow(String label, String value) {
+        LinearLayout row = createSettingRow(label, value);
+        row.setOnClickListener(v -> clickFeedback());
+        containerStorageItems.addView(row);
+    }
+
+    // iPod Classic style About: two-column list (ported from Classy)
     private void loadStorageUI() {
-        try {
-            android.os.StatFs stat = new android.os.StatFs("/storage/sdcard0");
-
-            // 🚀 [버그 1 해결] 기기 용량이 클 때 숫자가 폭발(오버플로우)해서 에러가 나는 것을 막기 위해 (long)으로 강제 변환하여
-            // 계산합니다!
-            long blockSize = (long) stat.getBlockSize();
-            long total = ((long) stat.getBlockCount() * blockSize) / (1024 * 1024);
-            long free = ((long) stat.getAvailableBlocks() * blockSize) / (1024 * 1024);
-            long used = total - free;
-
-            if (pbStorage != null)
-                pbStorage.setVisibility(View.GONE);
-
-            LinearLayout storageLayout = findViewById(R.id.layout_storage_mode);
-            PieChartView pieChart = (PieChartView) storageLayout.findViewWithTag("pie_chart");
-
-            if (pieChart == null) {
-                pieChart = new PieChartView(this);
-                pieChart.setTag("pie_chart");
-
-                // 🚀 [버그 2 해결] 차트가 너무 커서 아래 글씨를 화면 밖으로 밀어내지 않도록 크기를 140dp로 최적화합니다.
-                int size = (int) (140 * getResources().getDisplayMetrics().density);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
-                lp.setMargins(0, 0, 0, 30);
-                pieChart.setLayoutParams(lp);
-
-                storageLayout.addView(pieChart, 1);
-            }
-
-            // 🚀 [버그 3 해결] 밋밋한 흰색(글자색) 대신, 테마의 진짜 강조 색상(버튼 포커스 색상)을 뽑아와서 투명도를 뺀 원색으로 칠합니다!
-            int themeColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
-            pieChart.setStorageData(used, total, themeColor);
-
-            // 🚀 [iPod 스타일 About] 곡/앨범/아티스트 개수 + 앱 버전 + 기기 모델을 함께 표시합니다!
-            HashSet<String> uniqueAlbums = new HashSet<>();
-            HashSet<String> uniqueArtists = new HashSet<>();
-            for (SongItem song : customLibrary) {
-                if (song.album != null) uniqueAlbums.add(song.album);
-                if (song.albumArtist != null) uniqueArtists.add(song.albumArtist);
-            }
-
-            String versionName = "";
-            try {
-                versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            } catch (Exception e) {
-            }
-
-            // 텍스트 정보 세팅 및 화면 강제 노출
-            tvStorageDetails.setText(
-                    t("Total Capacity") + " :  " + total + " MB\n" +
-                            t("Used Space") + " :  " + used + " MB\n" +
-                            t("Free Space") + " :  " + free + " MB\n\n" +
-                            t("Songs") + " :  " + customLibrary.size() + "\n" +
-                            t("Albums") + " :  " + uniqueAlbums.size() + "\n" +
-                            t("Artists") + " :  " + uniqueArtists.size() + "\n\n" +
-                            t("Model") + " :  " + android.os.Build.MODEL + "\n" +
-                            t("Software Version") + " :  " + versionName);
-            tvStorageDetails.setGravity(Gravity.CENTER);
-            tvStorageDetails.setLineSpacing(15f, 1f);
-            tvStorageDetails.setVisibility(View.VISIBLE);
-
-        } catch (Exception e) {
-            tvStorageDetails.setText(t("Storage Error: Failed to calculate space."));
-            tvStorageDetails.setVisibility(View.VISIBLE);
+        containerStorageItems.removeAllViews();
+        tvStorageHeader.setText(t("About"));
+        tvStorageHeader.setTextColor(ThemeManager.getTextColorPrimary());
+        java.util.HashSet<String> albums = new java.util.HashSet<>(), artists = new java.util.HashSet<>();
+        for (SongItem song : customLibrary) {
+            if (song.album != null && !song.album.trim().isEmpty()) albums.add(song.album);
+            if (song.albumArtist != null && !song.albumArtist.trim().isEmpty()) artists.add(song.albumArtist);
         }
+        addAboutRow("Songs", String.valueOf(customLibrary.size()));
+        addAboutRow("Videos", String.valueOf(videoLibrary.size()));
+        addAboutRow("Albums", String.valueOf(albums.size()));
+        addAboutRow("Artists", String.valueOf(artists.size()));
+        for (String path : new String[] { "/storage/sdcard0", "/storage/sdcard1" }) {
+            File root = new File(path);
+            if (!root.isDirectory()) continue;
+            String tag = path.endsWith("0") ? "" : "SD Card ";
+            try {
+                android.os.StatFs st = new android.os.StatFs(path);
+                long bs = (long) st.getBlockSize();
+                addAboutRow(tag + "Capacity", formatStorageSize((long) st.getBlockCount() * bs));
+                addAboutRow(tag + "Available", formatStorageSize((long) st.getAvailableBlocks() * bs));
+            } catch (Exception e) {
+                addAboutRow(tag + "Capacity", "-");
+            }
+        }
+        String versionName = "";
+        try {
+            versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception ignored) {
+        }
+        addAboutRow("Software Version", versionName);
+        addAboutRow("Model", android.os.Build.MODEL);
+        containerStorageItems.post(() -> {
+            if (containerStorageItems.getChildCount() > 0) containerStorageItems.getChildAt(0).requestFocus();
+        });
     }
 
     // 🚀 [직결 성공] 포커스 시스템을 우회하여 정중앙 앨범의 노래 리스트로 다이렉트 진입합니다!
@@ -5549,12 +5529,10 @@ public class MainActivity extends Activity {
         String lockIcon = isOpen ? "📶 " : "🔒 ";
 
         // 연결된 기기 앞에는 투박한 글씨 대신 애플처럼 예쁜 체크마크(✔) 부여!
-        String prefix = isConnected ? "✔ " : "";
-
-        Button btnWifi = createListButton(prefix + lockIcon + ssid);
+        Button btnWifi = createListButton(lockIcon + ssid);
+        com.themoon.y1.views.ListMarks.markChosen(btnWifi, isConnected);
 
         if (isConnected) {
-            btnWifi.setTextColor(0xFF00FF00); // 눈에 확 띄는 초록색!
             btnWifi.setTypeface(ThemeManager.getCustomFontBold()); // 굵은 글씨로 강조!
         }
 
@@ -5647,6 +5625,11 @@ public class MainActivity extends Activity {
 
         layout.addView(tvLeft);
         layout.addView(tvRight);
+        // Classy: a drawn thin chevron instead of the text "〉" at the end of the value
+        if (com.themoon.y1.views.ListMarks.hasChevron(rightText)) {
+            tvRight.setText(com.themoon.y1.views.ListMarks.stripChevron(rightText));
+            layout.addView(new com.themoon.y1.views.ListMarks.ChevronView(this, tvLeft));
+        }
 
         layout.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
@@ -6204,7 +6187,7 @@ public class MainActivity extends Activity {
                         .setPositiveButton(t("Shut Down"), new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int which) {
                                 try {
-                                    Process proc = Runtime.getRuntime().exec(new String[] { "su", "-c", "reboot -p" });
+                                    Process proc = Runtime.getRuntime().exec(new String[] { "su", "-c", "sync; sleep 1; sync; reboot -p" });
                                     proc.waitFor();
                                 } catch (Exception e) {
                                     try {
@@ -6545,11 +6528,8 @@ public class MainActivity extends Activity {
         langMgr.loadAvailableLanguages(); // 폴더에서 다시 스캔
 
         // 1. 기본 제공 영어 버튼
-        String enPrefix = langMgr.currentLangFileName.equals("English (Default)") ? "✔ " : "   ";
-        Button btnEng = createListButton(enPrefix + "English (Default)");
-        if (langMgr.currentLangFileName.equals("English (Default)")) {
-            btnEng.setTextColor(0xFF00FF00);
-        }
+        Button btnEng = createListButton("English (Default)");
+        com.themoon.y1.views.ListMarks.markChosen(btnEng, langMgr.currentLangFileName.equals("English (Default)"));
         btnEng.setOnClickListener(v -> {
             clickFeedback();
             prefs.edit().putString("app_language", "English (Default)").commit();
@@ -6560,11 +6540,8 @@ public class MainActivity extends Activity {
 
         // 2. 외부에서 읽어온 JSON 언어팩들 목록 나열
         for (final File f : langMgr.availableLangFiles) {
-            String prefix = langMgr.currentLangFileName.equals(f.getName()) ? "✔ " : "   ";
-            Button btnLang = createListButton(prefix + f.getName().replace(".json", ""));
-            if (langMgr.currentLangFileName.equals(f.getName())) {
-                btnLang.setTextColor(0xFF00FF00);
-            }
+            Button btnLang = createListButton(f.getName().replace(".json", ""));
+            com.themoon.y1.views.ListMarks.markChosen(btnLang, langMgr.currentLangFileName.equals(f.getName()));
 
             btnLang.setOnClickListener(v -> {
                 clickFeedback();
@@ -12141,6 +12118,11 @@ public class MainActivity extends Activity {
                 clickFeedback();
                 return true;
             }
+            if (keyCode == 21 || keyCode == 22) { // wheel scrolls the list
+                View f = getCurrentFocus();
+                View n = f != null ? f.focusSearch(keyCode == 21 ? View.FOCUS_UP : View.FOCUS_DOWN) : null;
+                if (n != null && n != f) n.requestFocus();
+            }
             return true;
         }
 
@@ -12779,6 +12761,8 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (lowBatteryOverlay != null && event.getAction() == KeyEvent.ACTION_DOWN && lowBatteryOverlay.consumeKey())
+            return true;
         if (handleCenterGesture(event)) return true;
         if (inputLocked) return true;
         int keyCode = event.getKeyCode();
@@ -14350,12 +14334,10 @@ public class MainActivity extends Activity {
             for (int i = 0; i < eqPresetNames.size(); i++) {
                 final int pIdx = i;
                 final String pId = "preset_" + pIdx;
-                String prefix = currentEqProfile.equals(pId) ? "✔ " : "   ";
-
-                Button btn = createListButton(prefix + t(eqPresetNames.get(i)));
+                Button btn = createListButton(t(eqPresetNames.get(i)));
+                com.themoon.y1.views.ListMarks.markChosen(btn, currentEqProfile.equals(pId));
 
                 if (currentEqProfile.equals(pId)) {
-                    btn.setTextColor(0xFF00FF00);
                     btn.setTypeface(ThemeManager.getCustomFontBold());
                     targetFocusView[0] = btn; // 🎯 [핵심] 현재 활성화된 버튼 객체를 금고에 저장!
                 }
@@ -14389,12 +14371,10 @@ public class MainActivity extends Activity {
                 if (prof.trim().isEmpty())
                     continue;
                 final String cId = "custom_" + prof;
-                String prefix = currentEqProfile.equals(cId) ? "✔ " : "   ";
-
-                Button btn = createListButton(prefix + prof);
+                Button btn = createListButton(prof);
+                com.themoon.y1.views.ListMarks.markChosen(btn, currentEqProfile.equals(cId));
 
                 if (currentEqProfile.equals(cId)) {
-                    btn.setTextColor(0xFF00FF00);
                     btn.setTypeface(ThemeManager.getCustomFontBold());
                     targetFocusView[0] = btn; // 🎯 [핵심] 현재 커스텀 EQ 버튼 객체도 금고에 저장!
                 }
