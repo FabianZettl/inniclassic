@@ -14050,10 +14050,12 @@ public class MainActivity extends Activity {
 
         // 🚀 [핵심 방어막] 이미 현재 버전과 같거나 더 높은 버전의 테마가 깔려있다면 건너뜁니다!
         // 만약 앱 버전이 올라갔다면(예: 1 -> 2) 이 조건문을 통과하여 테마를 새로 덮어씌웁니다.
-        if (lastInstalledVersion >= currentAppVersion)
+        File targetDir = new File("/storage/sdcard0/Y1_Themes");
+        // Also reinstall when the folder is empty (e.g. another launcher's cleanup removed the themes)
+        String[] existing = targetDir.list();
+        if (lastInstalledVersion >= currentAppVersion && existing != null && existing.length > 0)
             return;
 
-        File targetDir = new File("/storage/sdcard0/Y1_Themes");
         if (!targetDir.exists())
             targetDir.mkdirs();
 
