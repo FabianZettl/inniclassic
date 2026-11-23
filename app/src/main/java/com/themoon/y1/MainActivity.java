@@ -5844,6 +5844,33 @@ public class MainActivity extends Activity {
         return btn;
     }
 
+    private void showPowerOffDialog() {
+        new AlertDialog.Builder(MainActivity.this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(t("Power Off"))
+                .setMessage(t("Do you want to shut down the device?"))
+                .setPositiveButton(t("Shut Down"), new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        try {
+                            Process proc = Runtime.getRuntime().exec(new String[] { "su", "-c", "sync; sleep 1; sync; reboot -p" });
+                            proc.waitFor();
+                        } catch (Exception e) {
+                            try {
+                                Intent intent = new Intent("android.intent.action.ACTION_REQUEST_SHUTDOWN");
+                                intent.putExtra("android.intent.extra.KEY_CONFIRM", false);
+                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(intent);
+                            } catch (Exception ex) {
+                                Toast.makeText(MainActivity.this,
+                                        t("System security prevents powering off directly from the app."),
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    }
+                })
+                .setNegativeButton(t("Cancel"), null)
+                .show();
+    }
+
     private void buildSettingsUI() {
         currentSettingsDepth = 0; // 🚀 메인 설정은 깊이 0
 
@@ -6198,30 +6225,7 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 clickFeedback();
-                new AlertDialog.Builder(MainActivity.this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                        .setTitle(t("Power Off"))
-                        .setMessage(t("Do you want to shut down the device?"))
-                        .setPositiveButton(t("Shut Down"), new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                try {
-                                    Process proc = Runtime.getRuntime().exec(new String[] { "su", "-c", "sync; sleep 1; sync; reboot -p" });
-                                    proc.waitFor();
-                                } catch (Exception e) {
-                                    try {
-                                        Intent intent = new Intent("android.intent.action.ACTION_REQUEST_SHUTDOWN");
-                                        intent.putExtra("android.intent.extra.KEY_CONFIRM", false);
-                                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                        startActivity(intent);
-                                    } catch (Exception ex) {
-                                        Toast.makeText(MainActivity.this,
-                                                t("System security prevents powering off directly from the app."),
-                                                Toast.LENGTH_LONG).show();
-                                    }
-                                }
-                            }
-                        })
-                        .setNegativeButton(t("Cancel"), null)
-                        .show();
+                showPowerOffDialog();
             }
         });
         containerSettingsItems.addView(btnPowerOff);
@@ -15334,6 +15338,15 @@ public class MainActivity extends Activity {
             toggleVisualizer();
         });
         layout.addView(btnVisualizer);
+
+        View btnPower = createListButtonWithIcon("", t("Power Off"));
+        btnPower.setOnKeyListener(dialogWheelListener);
+        btnPower.setOnClickListener(v -> {
+            clickFeedback();
+            dialog.dismiss();
+            showPowerOffDialog();
+        });
+        layout.addView(btnPower);
 
         View btnCancel = createListButtonWithIcon("", t("Cancel"));
         btnCancel.setOnKeyListener(dialogWheelListener);

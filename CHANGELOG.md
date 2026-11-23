@@ -2,6 +2,11 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.4.9] - 2026-11-23
+
+### Added
+- **Power Off in the Now Playing hold-menu** (long-press Play/Pause), with the same confirmation as in Settings (#20).
+
 ## [1.4.8] - 2026-11-23
 
 ### Added
