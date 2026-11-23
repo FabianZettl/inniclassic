@@ -2,6 +2,11 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.4.8] - 2026-11-23
+
+### Added
+- **Mono Audio** (Settings): mixes left and right into both channels, for listening with one earbud. Applies to tracks played through the ExoPlayer path.
+
 ## [1.4.7] - 2026-11-23
 
 ### Changed

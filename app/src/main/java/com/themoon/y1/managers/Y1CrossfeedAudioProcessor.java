@@ -16,9 +16,16 @@ public class Y1CrossfeedAudioProcessor implements AudioProcessor {
     private ByteBuffer buffer = EMPTY_BUFFER;
     private boolean inputEnded = false;
 
+    private boolean mono = false;
     private float crossfeedLevel = 0.0f;
     private float alpha = 0.0f;
     private float lastL = 0.0f, lastR = 0.0f;
+
+    /** Mixes left and right into both channels (one earbud). */
+    public void setMono(boolean mono) {
+        this.mono = mono;
+        flush();
+    }
 
     public void setIntensity(int level) {
         if (level == 0) {
@@ -65,6 +72,18 @@ public class Y1CrossfeedAudioProcessor implements AudioProcessor {
             buffer = ByteBuffer.allocateDirect(remaining).order(ByteOrder.nativeOrder());
         } else {
             buffer.clear();
+        }
+
+        if (mono && isFormatSupported) {
+            while (inputBuffer.remaining() >= 4) {
+                short m = (short) ((inputBuffer.getShort() + inputBuffer.getShort()) / 2);
+                buffer.putShort(m);
+                buffer.putShort(m);
+            }
+            if (inputBuffer.hasRemaining()) buffer.put(inputBuffer);
+            buffer.flip();
+            outputBuffer = buffer;
+            return;
         }
 
         // 🚀 스위치가 꺼져있거나 16비트 스테레오가 아니라면, 수학 공식을 건너뛰고 0.0001초 만에 원본 그대로 프리패스!

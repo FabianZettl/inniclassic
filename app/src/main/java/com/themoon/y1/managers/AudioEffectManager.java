@@ -53,6 +53,7 @@ public class AudioEffectManager {
         ensureAudioEffectsReady();
 
         com.themoon.y1.managers.AudioPlayerManager.getInstance().crossfeedProcessor.setIntensity(main.currentCrossfeedStep);
+        com.themoon.y1.managers.AudioPlayerManager.getInstance().crossfeedProcessor.setMono(main.prefs.getBoolean("mono_audio", false));
 
         if (main.bassBoost == null || main.virtualizer == null) return;
         try {

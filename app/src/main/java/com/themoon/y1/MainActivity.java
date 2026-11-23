@@ -6139,6 +6139,19 @@ public class MainActivity extends Activity {
             }
         });
         containerSettingsItems.addView(btnLoopScrollToggle);
+        final LinearLayout btnMono = createSettingRow("Mono Audio",
+                prefs.getBoolean("mono_audio", false) ? t("ON") : t("OFF"));
+        btnMono.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                boolean on = !prefs.getBoolean("mono_audio", false);
+                prefs.edit().putBoolean("mono_audio", on).commit();
+                ((TextView) btnMono.getChildAt(1)).setText(on ? t("ON") : t("OFF"));
+                com.themoon.y1.managers.AudioPlayerManager.getInstance().crossfeedProcessor.setMono(on);
+            }
+        });
+        containerSettingsItems.addView(btnMono);
         final LinearLayout btnBattPct = createSettingRow("Battery Percentage",
                 prefs.getBoolean("battery_percent", false) ? t("ON") : t("OFF"));
         btnBattPct.setOnClickListener(new View.OnClickListener() {
