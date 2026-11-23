@@ -2,6 +2,22 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.4.6] - 2026-11-23
+
+UI pass ported from the Classy fork.
+
+### Changed
+- **Lists:** settings rows use a thin drawn chevron instead of the text "〉"; Theme, Language, EQ and Wi-Fi lists show the current choice as a drawn tick in a fixed column instead of a green "✔" prefix.
+- **Status bar:** iPod-style solid play/pause icons.
+- **Now Playing:** shuffle/repeat icons redrawn (Tabler style).
+- **About:** now a scrollable two-column list (Songs, Videos, Albums, Artists, capacity, available, version, model).
+
+### Added
+- **Low-battery warnings:** a banner at 10 % and a "Please charge" screen at 2 %; any key closes them.
+
+### Fixed
+- **Settings/theme could be lost after Settings → Power Off** — the filesystem is now synced before shutdown (#9, #19).
+
 ## [1.4.5] - 2026-09-30
 
 ### Fixed
