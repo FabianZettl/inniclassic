@@ -2,6 +2,12 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.5.0] - 2026-11-23
+
+### Added
+- **Letter Jump** and **Letter Jump Sensitivity** (Settings): turn the letter jump on a fast wheel turn off, or choose High/Normal/Low.
+- **Multiple artists in one tag:** a track artist like "A; B" is listed under A and under B in Artists.
+
 ## [1.4.9] - 2026-11-23
 
 ### Added

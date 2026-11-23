@@ -5844,6 +5844,16 @@ public class MainActivity extends Activity {
         return btn;
     }
 
+    /** True if the track artist is the given artist or one of several separated by ";". */
+    private static boolean artistMatches(String trackArtist, String artist) {
+        if (trackArtist == null) return false;
+        if (trackArtist.equals(artist)) return true;
+        for (String part : trackArtist.split(";")) {
+            if (part.trim().equals(artist)) return true;
+        }
+        return false;
+    }
+
     private void showPowerOffDialog() {
         new AlertDialog.Builder(MainActivity.this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(t("Power Off"))
@@ -6166,6 +6176,32 @@ public class MainActivity extends Activity {
             }
         });
         containerSettingsItems.addView(btnLoopScrollToggle);
+        final LinearLayout btnLetterJump = createSettingRow("Letter Jump",
+                prefs.getBoolean("letter_jump", true) ? t("ON") : t("OFF"));
+        btnLetterJump.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                boolean on = !prefs.getBoolean("letter_jump", true);
+                prefs.edit().putBoolean("letter_jump", on).commit();
+                ((TextView) btnLetterJump.getChildAt(1)).setText(on ? t("ON") : t("OFF"));
+            }
+        });
+        containerSettingsItems.addView(btnLetterJump);
+
+        final String[] jumpNames = { "High", "Normal", "Low" };
+        final LinearLayout btnLetterSens = createSettingRow("Letter Jump Sensitivity",
+                t(jumpNames[Math.max(0, Math.min(2, prefs.getInt("letter_jump_sens", 1)))]));
+        btnLetterSens.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                int next = (prefs.getInt("letter_jump_sens", 1) + 1) % 3;
+                prefs.edit().putInt("letter_jump_sens", next).commit();
+                ((TextView) btnLetterSens.getChildAt(1)).setText(t(jumpNames[next]));
+            }
+        });
+        containerSettingsItems.addView(btnLetterSens);
         final LinearLayout btnMono = createSettingRow("Mono Audio",
                 prefs.getBoolean("mono_audio", false) ? t("ON") : t("OFF"));
         btnMono.setOnClickListener(new View.OnClickListener() {
@@ -8927,7 +8963,8 @@ public class MainActivity extends Activity {
             // (Album Artists에서 들어왔으면 albumArtist 기준, Artists에서 들어왔으면 트랙 artist 기준)
             if (type.equals("ALBUM") && !categoryArtistFilter.isEmpty()) {
                 String matchField = categoryArtistFilterIsTrackArtist ? song.artist : song.albumArtist;
-                if (!categoryArtistFilter.equals(matchField)) {
+                if (!(categoryArtistFilterIsTrackArtist ? artistMatches(matchField, categoryArtistFilter)
+                        : categoryArtistFilter.equals(matchField))) {
                     continue;
                 }
             }
@@ -8947,7 +8984,14 @@ public class MainActivity extends Activity {
             else if (type.equals("COMPOSER"))
                 val = song.composer;
 
-            uniqueCategories.add(val);
+            if (type.equals("TRACK_ARTIST")) {
+                // A tag like "A; B" lists each artist on its own
+                for (String part : val.split(";")) {
+                    if (!part.trim().isEmpty()) uniqueCategories.add(part.trim());
+                }
+            } else {
+                uniqueCategories.add(val);
+            }
         }
 
         List<String> categories = new ArrayList<>(uniqueCategories);
@@ -9723,7 +9767,7 @@ public class MainActivity extends Activity {
                 }
 
                 if (isRecentPassed && (virtualQueryType.equals("ALL") || virtualQueryType.equals("RECENT") ||
-                        (virtualQueryType.equals("ARTIST") && song.artist.equals(virtualQueryValue)) ||
+                        (virtualQueryType.equals("ARTIST") && artistMatches(song.artist, virtualQueryValue)) ||
                         (virtualQueryType.equals("ARTIST_ALL_ALBUMS") && song.albumArtist.equals(virtualQueryValue)) ||
                         (virtualQueryType.equals("ALBUM") && song.album.equals(virtualQueryValue)) ||
                         (virtualQueryType.equals("COVER_FLOW_ALBUM") && song.album.equals(virtualQueryValue)) ||
@@ -12445,7 +12489,10 @@ public class MainActivity extends Activity {
                 // (150ms/2칸은 너무 쉽게 튀어서, 진짜 빠르게 돌릴 때만 반응하도록 문턱을 다시 살짝 높임)
                 if (now - lastWheelTime < 100) {
                     wheelFastCount++;
-                    if (wheelFastCount >= 3)
+                    // Letter Jump setting: off, or sensitivity High/Normal/Low = 2/3/5 quick steps
+                    int[] jumpSteps = { 2, 3, 5 };
+                    if (prefs.getBoolean("letter_jump", true)
+                            && wheelFastCount >= jumpSteps[Math.max(0, Math.min(2, prefs.getInt("letter_jump_sens", 1)))])
                         isFastScroll = true;
                 } else {
                     wheelFastCount = 0; // 천천히 돌리면 즉시 초기화
