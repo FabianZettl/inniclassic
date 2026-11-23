@@ -2053,6 +2053,7 @@ public class MainActivity extends Activity {
         // 🚀 [여기에 새로 추가!] 기존 배터리 숫자(텍스트)를 숨기고 그 자리에 플랫 아이콘을 끼워 넣습니다.
         tvStatusBattery.setVisibility(View.GONE);
         batteryIconView = new BatteryIconView(this);
+        batteryIconView.setShowPercentage(getSharedPreferences("Y1_SETTINGS", MODE_PRIVATE).getBoolean("battery_percent", false));
         ViewGroup statusParent = (ViewGroup) tvStatusBattery.getParent();
         int bIdx = statusParent.indexOfChild(tvStatusBattery);
 
@@ -5290,20 +5291,10 @@ public class MainActivity extends Activity {
             }
         }
 
-        String prefix = isConnected ? "((♪)) [CONNECTED] " : "✔ ";
-        final Button btnDevice = createListButton(prefix + name);
-
-        if (isConnected) {
-            int themeColor = 0xFF00FFFF;
-            try {
-                themeColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
-            } catch (Exception e) {
-            }
-            btnDevice.setTextColor(themeColor);
+        final Button btnDevice = createListButton(name);
+        com.themoon.y1.views.ListMarks.markChosen(btnDevice, isConnected);
+        if (isConnected)
             btnDevice.setTypeface(ThemeManager.getCustomFontBold());
-        } else {
-            btnDevice.setTextColor(0xFF00FF00);
-        }
 
         // 🚀 [치명적 버그 수정] 서브 메뉴용 투명 폴더(LinearLayout)를 박살내고 리스트에 직속으로 붙입니다!
 
@@ -5758,7 +5749,7 @@ public class MainActivity extends Activity {
         tvText.setLayoutParams(textLp);
 
         // 🚀 [iPod 스타일] 화살표(〉)는 평소엔 숨겨져 있다가, 포커스가 닿았을 때만 흰색으로 나타납니다
-        final TextView tvArrow = new TextView(this);
+        final TextView tvArrow = new com.themoon.y1.views.ListMarks.ChevronText(this);
         tvArrow.setText("〉");
         tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 20f * d);
         tvArrow.setTextColor(0xFFFFFFFF);
@@ -6148,6 +6139,19 @@ public class MainActivity extends Activity {
             }
         });
         containerSettingsItems.addView(btnLoopScrollToggle);
+        final LinearLayout btnBattPct = createSettingRow("Battery Percentage",
+                prefs.getBoolean("battery_percent", false) ? t("ON") : t("OFF"));
+        btnBattPct.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                boolean on = !prefs.getBoolean("battery_percent", false);
+                prefs.edit().putBoolean("battery_percent", on).commit();
+                ((TextView) btnBattPct.getChildAt(1)).setText(on ? t("ON") : t("OFF"));
+                if (batteryIconView != null) batteryIconView.setShowPercentage(on);
+            }
+        });
+        containerSettingsItems.addView(btnBattPct);
         final LinearLayout btnTimeout = createSettingRow("Screen Timeout", t(TIMEOUT_NAMES[currentTimeoutIndex]));
         btnTimeout.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -7614,7 +7618,7 @@ public class MainActivity extends Activity {
         tvTitle.setLayoutParams(textLp);
         row.addView(tvTitle);
 
-        final TextView tvArrow = new TextView(this);
+        final TextView tvArrow = new com.themoon.y1.views.ListMarks.ChevronText(this);
         tvArrow.setText("〉");
         tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 20f * d);
         tvArrow.setTextColor(0xFFFFFFFF);

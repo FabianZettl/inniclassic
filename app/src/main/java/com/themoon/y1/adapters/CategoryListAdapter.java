@@ -156,7 +156,7 @@ public class CategoryListAdapter extends BaseAdapter {
             row.addView(textStack);
 
             // 🚀 포커스된 행에만 나타나는 실제 아이팟 스타일 우측 화살표
-            tvArrow = new TextView(MainActivity.instance);
+            tvArrow = new com.themoon.y1.views.ListMarks.ChevronText(MainActivity.instance);
             tvArrow.setText("〉");
             tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * d);
             tvArrow.setVisibility(View.GONE);
@@ -461,7 +461,7 @@ public class CategoryListAdapter extends BaseAdapter {
             row.addView(tvMain);
 
             // 🚀 포커스된 행에만 나타나는 실제 아이팟 스타일 우측 화살표
-            tvArrow = new TextView(MainActivity.instance);
+            tvArrow = new com.themoon.y1.views.ListMarks.ChevronText(MainActivity.instance);
             tvArrow.setText("〉");
             tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * d);
             tvArrow.setVisibility(View.GONE);

@@ -2,6 +2,15 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.4.7] - 2026-11-23
+
+### Changed
+- **Chevron arrows** in the main menu, Music/Videos lists and category lists are now the thin drawn chevron (as in Settings).
+- **Bluetooth list** shows the connected device with the drawn tick.
+
+### Added
+- **Battery Percentage** setting (Settings): shows the level inside the battery icon, with the charging bolt next to the digits.
+
 ## [1.4.6] - 2026-11-23
 
 UI pass ported from the Classy fork.

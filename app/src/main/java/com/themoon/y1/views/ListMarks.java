@@ -95,6 +95,50 @@ public final class ListMarks {
         }
     }
 
+
+    /**
+     * Drop-in replacement for the text arrow (a TextView): same API (visibility, text colour, text size),
+     * but it draws the thin chevron instead of the "〉" glyph.
+     */
+    public static class ChevronText extends TextView {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+
+        public ChevronText(Context context) {
+            super(context);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            setText("〉"); // keeps measuring and callers' setText harmless
+        }
+
+        private float cap() { return getTextSize() * 0.72f; }
+
+        @Override
+        protected void onMeasure(int w, int h) {
+            super.onMeasure(w, h);
+            float cap = cap();
+            setMeasuredDimension((int) Math.ceil(cap * WIDTH_RATIO + 2), getMeasuredHeight());
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            float cap = cap();
+            float stroke = Math.max(1f, cap * STROKE_RATIO * 1.4f);
+            float half = stroke / 2, w = cap * WIDTH_RATIO, h = cap * HEIGHT_RATIO;
+            paint.setStrokeWidth(stroke);
+            paint.setColor(getCurrentTextColor());
+            path.reset();
+            path.moveTo(half, half);
+            path.lineTo(w - half, h / 2);
+            path.lineTo(half, h - half);
+            canvas.save();
+            canvas.translate(getWidth() - w - 1, (getHeight() - h) / 2f);
+            canvas.drawPath(path, paint);
+            canvas.restore();
+        }
+    }
+
     // ---- Tick (Classy CheckMark) ----
     private static final float TICK_STROKE_RATIO = 0.19f;
     private static final float TICK_COLUMN_DP = 28f;

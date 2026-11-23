@@ -15,6 +15,8 @@ public class BatteryIconView extends View {
     private int level = 100;
     private boolean isCharging = false;
     private int color = Color.WHITE;
+    private boolean showPercentage = false;
+    private final android.graphics.Rect textBounds = new android.graphics.Rect();
 
     private Paint paintFill, paintStroke, paintTerminal, paintText, paintBolt;
     private RectF rectShell, rectFill, rectTerminal;
@@ -57,6 +59,13 @@ public class BatteryIconView extends View {
         this.level = Math.max(0, Math.min(100, level));
         this.isCharging = isCharging;
         invalidate(); // 값이 바뀌면 즉시 화면을 다시 그립니다!
+    }
+
+    public void setShowPercentage(boolean show) {
+        if (showPercentage != show) {
+            showPercentage = show;
+            invalidate();
+        }
     }
 
     public void setColor(int color) {
@@ -114,6 +123,44 @@ public class BatteryIconView extends View {
         if (currentFillWidth > 0) {
             rectFill.set(padding, padding, padding + currentFillWidth, h - padding);
             canvas.drawRoundRect(rectFill, Math.max(0f, pillRadius - padding), Math.max(0f, pillRadius - padding), paintFill);
+        }
+
+        // Battery percentage inside the body (Classy style): digits in the theme colour over the empty part,
+        // in a dark/white contrast colour over the filled part; the bolt sits to the right of the digits.
+        if (showPercentage) {
+            String text = String.valueOf(level);
+            paintText.setTextAlign(Paint.Align.LEFT);
+            paintText.setTypeface(com.themoon.y1.ThemeManager.getCustomFontBold());
+            paintText.setTextSize((h - padding * 2f) * 0.8f);
+            paintText.getTextBounds(text, 0, text.length(), textBounds);
+            float boltSpace = isCharging ? paintText.getTextSize() * 0.5f : 0f;
+            float x = padding + (maxFillWidth - textBounds.width() - boltSpace) / 2f - textBounds.left;
+            float y = (h + textBounds.height()) / 2f;
+            int onFill = (level <= 20 && !isCharging) ? Color.WHITE : 0xFF1C1C1E;
+            canvas.save();
+            canvas.clipRect(padding + currentFillWidth, 0, w, h);
+            paintText.setColor(color);
+            canvas.drawText(text, x, y, paintText);
+            canvas.restore();
+            canvas.save();
+            canvas.clipRect(0, 0, padding + currentFillWidth, h);
+            paintText.setColor(onFill);
+            canvas.drawText(text, x, y, paintText);
+            canvas.restore();
+            if (isCharging) {
+                float bh = textBounds.height(), bw = bh * 0.55f, bl = x + textBounds.width() + textBounds.left + bh * 0.12f, bt = y - bh;
+                boltPath.reset();
+                boltPath.moveTo(bl + bw * 0.62f, bt);
+                boltPath.lineTo(bl + bw * 0.10f, bt + bh * 0.58f);
+                boltPath.lineTo(bl + bw * 0.42f, bt + bh * 0.58f);
+                boltPath.lineTo(bl + bw * 0.38f, bt + bh);
+                boltPath.lineTo(bl + bw * 0.90f, bt + bh * 0.42f);
+                boltPath.lineTo(bl + bw * 0.58f, bt + bh * 0.42f);
+                boltPath.close();
+                paintBolt.setColor(color);
+                canvas.drawPath(boltPath, paintBolt);
+            }
+            return;
         }
 
         // 🚀 5. 충전 중이면 배터리 정중앙에 작은 번개 아이콘을 그려 넣습니다!
