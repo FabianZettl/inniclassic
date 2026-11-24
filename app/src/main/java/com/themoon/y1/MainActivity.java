@@ -2054,9 +2054,9 @@ public class MainActivity extends Activity {
         tvStatusBattery = findViewById(R.id.tv_status_battery);
         tvStatusClock.setShadowLayer(0, 0, 0, 0);
         // 🚀 [여기에 새로 추가!] 기존 배터리 숫자(텍스트)를 숨기고 그 자리에 플랫 아이콘을 끼워 넣습니다.
-        tvStatusBattery.setVisibility(View.GONE);
+        // The percentage is a text left of the icon (readable), not digits inside the 16 dp icon (#23)
+        tvStatusBattery.setVisibility(getSharedPreferences("Y1_SETTINGS", MODE_PRIVATE).getBoolean("battery_percent", false) ? View.VISIBLE : View.GONE);
         batteryIconView = new BatteryIconView(this);
-        batteryIconView.setShowPercentage(getSharedPreferences("Y1_SETTINGS", MODE_PRIVATE).getBoolean("battery_percent", false));
         ViewGroup statusParent = (ViewGroup) tvStatusBattery.getParent();
         int bIdx = statusParent.indexOfChild(tvStatusBattery);
 
@@ -2066,7 +2066,7 @@ public class MainActivity extends Activity {
                 (int) (30 * density), (int) (16 * density));
         blp.gravity = Gravity.CENTER_VERTICAL;
         blp.setMargins((int) (8 * density), 0, (int) (4 * density), 0);
-        statusParent.addView(batteryIconView, bIdx, blp);
+        statusParent.addView(batteryIconView, bIdx + 1, blp);
         ivStatusBluetooth = findViewById(R.id.iv_status_bluetooth);
         ivStatusWifi = findViewById(R.id.iv_status_wifi);
         ivStatusHeadphone = findViewById(R.id.iv_status_headphone);
@@ -6246,7 +6246,7 @@ public class MainActivity extends Activity {
                 boolean on = !prefs.getBoolean("battery_percent", false);
                 prefs.edit().putBoolean("battery_percent", on).commit();
                 ((TextView) btnBattPct.getChildAt(1)).setText(on ? t("ON") : t("OFF"));
-                if (batteryIconView != null) batteryIconView.setShowPercentage(on);
+                if (tvStatusBattery != null) tvStatusBattery.setVisibility(on ? View.VISIBLE : View.GONE);
             }
         });
         containerSettingsItems.addView(btnBattPct);

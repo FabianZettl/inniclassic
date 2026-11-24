@@ -2,6 +2,14 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.5.2] - 2026-11-24
+
+### Added
+- **FM Radio:** the radio keeps playing when the display times out (#10, thanks lskr-dev), and an optional RDS station name and radio text (#12).
+
+### Fixed
+- **Battery Percentage was unreadable (#23):** the digits were drawn inside the small battery icon. The percentage is now a text to the left of the icon.
+
 ## [1.5.1] - 2026-11-23
 
 ### Fixed
